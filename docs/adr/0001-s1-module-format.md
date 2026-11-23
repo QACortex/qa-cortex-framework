@@ -1,6 +1,6 @@
 # ADR 0001 — S1 module format: ship ESM-only
 
-- Status: accepted (spike S1, 2026-11-23)
+- Status: accepted (spike S1, 2026-11-23). Amended by the two dated addenda at the end (Step 3 review, Step 3B validation); finalised 2026-11-23. Only Node 22/24 runtime checks remain, pending CI.
 - Spike code: `spikes/s1-module-format/` (throwaway)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2 (+ 6.0.3 API), `@playwright/test` 1.65.1 and 1.60.0, attw 0.18.5, publint 0.3.25
 
@@ -122,6 +122,12 @@ This section records the Step 3 review. ESM-only is **retained**.
 ## Addendum: compatibility validation (2026-11-23)
 This section records the Step 3B runs. **No change to the decision or to the package manifest.**
 
+**Scope.** Every result in this addendum applies to the **S1 stub package** (`@qa-cortex/core@0.0.0-spike.1`):
+- two subpaths, `./config` and `./logger`
+- a single type-only Playwright import (`TestInfo`)
+
+These results show the package *format* works. They don't prove that the real `@qa-cortex/core` modules will compile against every supported Playwright version. The real package must pass the same checks in CI, because its type files will reference more Playwright types.
+
 ### Setup
 - **Package:** the S1 stub was rebuilt with **TypeScript 6.0.3** in a temp folder and packed (11 files, 2.0 kB). The spike source was not modified.
 - **Consumers:** four temp projects installed the tarball: CommonJS and ESM, each on Playwright **1.60.0** and **1.65.1**.
@@ -165,10 +171,13 @@ This section records the Step 3B runs. **No change to the decision or to the pac
 - **Required test 2** (`skipLibCheck: false` on Playwright 1.60 and latest) **passes for the stub.** It stays required in CI, because the stub imports only `TestInfo` and the real modules will use more Playwright types.
 - **Required test 3** (TS 5.8 and 5.9) **passes.** Keep it in CI to catch regressions.
 
-### Still open
-- **Node 22.12.0, latest 22 and latest 24 are untested.** They aren't installed locally, so this includes whether 22.12.0 prints the `require(esm)` warning. Required test 1 still has to run in CI.
-- **Linux and macOS are untested.**
-- **Playwright 1.61–1.64 are untested.**
+### Pending CI verification
+- **Node.js 22 and 24 runtime compatibility: pending CI verification.**
+  - Node 22.12.0, latest 22.x and latest 24.x have not been run, because they aren't installed locally.
+  - Official Node docs say `require(esm)` works on all three, with a probable one-time ExperimentalWarning on 22.12.0 only. Treat that as expected, not verified.
+  - Required test 1 (CJS and ESM consumer smoke tests on Node 22.12.0, latest 22, latest 24 and 26) must pass in CI before the first release. Its result decides whether the minimum stays `>=22.12` or moves to `>=22.13`.
+- **Linux and macOS:** pending CI (required test 4).
+- **Playwright 1.61–1.64:** untested. They're inside the peer range and assumed to work.
 
 ### Tooling note
 A globally installed TypeScript can be picked up by `npx tsc` in a folder without a local install; it happened once during these runs. Project scripts must call the workspace's local `tsc`.
