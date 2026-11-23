@@ -10,8 +10,10 @@ It is not a framework with its own runtime: raw Playwright always stays usable.
 ```
 packages/
   core/                 @qa-cortex/core (ESM-only, subpath exports)
-    src/config/         @qa-cortex/core/config (placeholder; see ADR 0002)
+    src/config/         @qa-cortex/core/config (typed, layered config; see ADR 0002)
     test/               package tests, run against the built output
+      types/            compile-only type tests (checked by `npm run typecheck`)
+      fixtures/         nested Playwright project used by the integration test
 docs/adr/               architecture decision records (start here)
 spikes/                 M0 technical spikes (S0–S4), kept as history; not built or linted
 tsconfig.base.json      shared compiler settings
@@ -36,6 +38,51 @@ Run from the repository root:
 | `npm run lint` | Runs ESLint with type-aware rules. |
 | `npm test` | Builds, then runs the package tests with Playwright Test. |
 | `npm run clean` | Removes build output. |
+
+## Configuration (`@qa-cortex/core/config`)
+
+Layered, validated, frozen configuration. Precedence: schema defaults → `base` → selected
+profile → `overrides`. The profile comes from `loadConfig({ profile })`, then the
+`QA_CORTEX_PROFILE` environment variable, then `defaultProfile`, then `"local"`.
+
+```ts
+// qa.config.ts
+import { coreSchema, defineConfig, z, type ConfigOf } from '@qa-cortex/core/config';
+
+export const schema = coreSchema.extend({
+  app: z.strictObject({ tenant: z.string() }), // use the re-exported `z`
+});
+export type AppConfig = ConfigOf<typeof schema>;
+
+export const qaConfig = defineConfig({
+  schema, // omit to use coreSchema as-is
+  base: { baseURL: 'http://localhost:3000', app: { tenant: 'acme' } },
+  profiles: {
+    local: {},
+    staging: { baseURL: 'https://staging.example.com' },
+  },
+});
+```
+
+```ts
+// playwright.config.ts: Playwright's own config stays in charge
+import { defineConfig } from '@playwright/test';
+import { loadConfig } from '@qa-cortex/core/config';
+import { qaConfig } from './qa.config.js';
+
+const qa = loadConfig(qaConfig); // validates now; a bad profile fails before any worker starts
+
+export default defineConfig({
+  use: { baseURL: qa.baseURL },
+});
+```
+
+- Invalid config throws a `ConfigError` listing every issue with the layer that caused it
+  (`[profile "staging"]`, `[not set in base, profile "staging"]`). Values are never printed.
+- The result is deep-frozen; `profile` holds the selected profile name.
+- `api` and `ai` are reserved top-level sections for future packages.
+- Both packages export a `defineConfig`. In a file that uses both, alias one of them,
+  e.g. `import { defineConfig as defineQaConfig } from '@qa-cortex/core/config'`.
 
 ## Key decisions
 

@@ -4,6 +4,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'packages',
   testMatch: '*/test/**/*.spec.ts',
+  // Nested projects that tests run in a child process, not part of this run.
+  testIgnore: '**/test/fixtures/**',
   reporter: [['list']],
   forbidOnly: !!process.env.CI,
 });

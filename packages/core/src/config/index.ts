@@ -1,20 +1,25 @@
-// @qa-cortex/core/config
+// @qa-cortex/core/config: typed, layered, validated configuration (ADR 0002).
 //
-// Placeholder entry for the configuration module. The loader, schema and merge rules
-// (ADR 0002) are not implemented yet; this file only fixes the public subpath and the
-// one contract that is already decided: the namespaces reserved for later packages.
+// Precedence: schema defaults → base → profile → overrides. The profile is chosen by
+// loadConfig({ profile }), then QA_CORTEX_PROFILE, then defaultProfile, then "local".
+// The result is deep-frozen. This module never imports Playwright or any API/AI code.
 
-/**
- * Top-level config sections owned by future packages (`api` for API testing, `ai` for
- * AI agents). Core never validates or interprets them; those packages bring their own
- * schemas (ADR 0002). Core must not import API or AI code.
- */
-export const RESERVED_NAMESPACES: readonly ['api', 'ai'] = Object.freeze(['api', 'ai'] as const);
+/** Zod 4, re-exported: build schema extensions with this `z`, not your own copy. */
+export { z } from 'zod';
 
-/** Name of a reserved config namespace. */
-export type ReservedNamespace = (typeof RESERVED_NAMESPACES)[number];
-
-/** True when `key` is a top-level config section reserved for a future package. */
-export function isReservedNamespace(key: string): key is ReservedNamespace {
-  return (RESERVED_NAMESPACES as readonly string[]).includes(key);
-}
+export { coreSchema, type ConfigSchema, type CoreConfig, type CoreSchema } from './schema.js';
+export {
+  DEFAULT_PROFILE,
+  PROFILE_ENV_VAR,
+  defineConfig,
+  loadConfig,
+  type ConfigDefinition,
+  type ConfigDefinitionInput,
+  type ConfigOf,
+  type ConfigOverlay,
+  type LoadOptions,
+  type LoadedConfig,
+} from './load.js';
+export { ConfigError, type ConfigIssue } from './errors.js';
+export { RESERVED_NAMESPACES, isReservedNamespace, type ReservedNamespace } from './reserved.js';
+export type { DeepPartial, DeepReadonly } from './types.js';

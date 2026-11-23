@@ -23,6 +23,18 @@ export default tseslint.config(
     },
   },
   {
+    // Compile-only type tests deliberately contain type errors (each marked @ts-expect-error).
+    // typescript-eslint sees those calls as unresolvable types, so the no-unsafe-* family
+    // reports noise here. tsc, not ESLint, is the checker for these files.
+    files: ['packages/*/test/types/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+  {
     // Published package source: rules that protect consumers (ADR 0001).
     files: ['packages/*/src/**/*.ts'],
     rules: {
