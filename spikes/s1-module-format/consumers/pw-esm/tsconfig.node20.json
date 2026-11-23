@@ -1,0 +1,2 @@
+{ "compilerOptions": { "module": "node20", "moduleResolution": "node16", "target": "es2023", "strict": true, "noEmit": true, "skipLibCheck": true, "types": ["node"] },
+  "include": ["playwright.config.ts", "tests"] }

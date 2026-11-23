@@ -1,0 +1,3 @@
+{ "name": "consumer-pw-cjs-160", "private": true, "type": "commonjs",
+  "dependencies": { "@qa-cortex/core": "file:../../qa-cortex-core-0.0.0-spike.1.tgz" },
+  "devDependencies": { "@playwright/test": "1.60.0", "@types/node": "^22" } }

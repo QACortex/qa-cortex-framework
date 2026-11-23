@@ -1,0 +1,3 @@
+{ "name": "consumer-pw-esm", "private": true, "type": "module",
+  "dependencies": { "@qa-cortex/core": "file:../../qa-cortex-core-0.0.0-spike.1.tgz" },
+  "devDependencies": { "@playwright/test": "1.65.1", "@types/node": "^22" } }

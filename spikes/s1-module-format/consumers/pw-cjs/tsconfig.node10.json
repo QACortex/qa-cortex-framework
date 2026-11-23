@@ -1,0 +1,2 @@
+{ "compilerOptions": { "module": "commonjs", "moduleResolution": "node10", "target": "es2023", "strict": true, "noEmit": true, "ignoreDeprecations": "6.0", "skipLibCheck": true, "types": ["node"] },
+  "include": ["playwright.config.ts", "tests"] }

@@ -1,0 +1,1 @@
+{ "name": "consumer-plain-cjs", "private": true, "type": "commonjs", "dependencies": { "@qa-cortex/core": "file:../../qa-cortex-core-0.0.0-spike.1.tgz" } }
