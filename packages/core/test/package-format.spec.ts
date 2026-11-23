@@ -11,10 +11,34 @@ const require = createRequire(import.meta.url);
 const run = promisify(execFile);
 
 test.describe('package format (ESM-only, subpath exports)', () => {
-  test('./config resolves to the built dist entry', () => {
-    const resolved = require.resolve('@qa-cortex/core/config');
-    expect(resolved.endsWith(join('dist', 'config', 'index.js'))).toBe(true);
-    expect(resolved.includes(`${sep}src${sep}`)).toBe(false);
+  for (const subpath of ['config', 'logger']) {
+    test(`./${subpath} resolves to the built dist entry`, () => {
+      const resolved = require.resolve(`@qa-cortex/core/${subpath}`);
+      expect(resolved.endsWith(join('dist', subpath, 'index.js'))).toBe(true);
+      expect(resolved.includes(`${sep}src${sep}`)).toBe(false);
+    });
+  }
+
+  // ADR 0001 required test 6: top-level await anywhere in a subpath's module graph would make
+  // require() throw ERR_REQUIRE_ASYNC_MODULE for CommonJS consumers. Plain Node child process.
+  test('plain Node: every exported subpath can be require()d', async () => {
+    const probe = `
+      const out = {};
+      for (const s of ['config', 'logger']) out[s] = Object.keys(require('@qa-cortex/core/' + s)).length;
+      process.stdout.write(JSON.stringify(out));`;
+    const { stdout, stderr } = await run(process.execPath, ['--input-type=commonjs', '-e', probe], { cwd: import.meta.dirname });
+    const counts = JSON.parse(stdout) as Record<string, number>;
+    expect(counts.config).toBeGreaterThan(0);
+    expect(counts.logger).toBeGreaterThan(0);
+    expect(stderr).toBe('');
+  });
+
+  test('the logger module does not depend on the config module', async () => {
+    const distDir = dirname(require.resolve('@qa-cortex/core/logger'));
+    for (const file of (await readdir(distDir)).filter((f) => f.endsWith('.js'))) {
+      // Module specifiers only (comments may mention the config module).
+      expect(await readFile(join(distDir, file), 'utf8'), file).not.toMatch(/(?:from\s*|import\(\s*|require\(\s*)['"](?:\.\.\/config\/|@qa-cortex\/core\/config)/);
+    }
   });
 
   // Runs in a plain Node child process on purpose. Inside this repo the package is reached
