@@ -118,3 +118,57 @@ This section records the Step 3 review. ESM-only is **retained**.
 - **Our type files depend on Playwright's types.** A type change in any minor release can break compiles while the code still runs. Keep Playwright type imports minimal, and prefer `Pick<>`-style structural types.
 - **The peer range covers more than we test.** Playwright 1.61–1.64 are assumed to work.
 - **Playwright 2.** The `<2` cap gives install warnings or `ERESOLVE` until we release.
+
+## Addendum: compatibility validation (2026-11-23)
+This section records the Step 3B runs. **No change to the decision or to the package manifest.**
+
+### Setup
+- **Package:** the S1 stub was rebuilt with **TypeScript 6.0.3** in a temp folder and packed (11 files, 2.0 kB). The spike source was not modified.
+- **Consumers:** four temp projects installed the tarball: CommonJS and ESM, each on Playwright **1.60.0** and **1.65.1**.
+- **TypeScript:** each project had TS **5.8.3, 5.9.3 and 6.0.3** installed locally; **5.7.3** was added as a control.
+- **Type checks:** every check used **`skipLibCheck: false`**.
+- **Platform:** Node 26.13.1, Windows 11.
+
+### Verified
+- **Runtime:**
+  - All four projects pass their Playwright tests, with no warnings.
+  - From a CJS file: `require()` and `import()` give the same instance and shared state.
+  - From an ES module: `import` and `createRequire` do the same.
+  - `require.resolve` and `import.meta.resolve` point into `dist/`, and `./package.json` is readable.
+  - The package root, deep `dist/` paths and unknown subpaths are blocked with `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+  - `process.features.require_module` is `true`.
+- **Types (identical on Playwright 1.60.0 and 1.65.1):**
+  | TypeScript | Format | `nodenext` | `node20` | `node16` | `bundler` |
+  |---|---|---|---|---|---|
+  | 5.7.3 | CJS | ❌ TS1479 | — | — | ✅ |
+  | 5.7.3 | ESM | ✅ | — | — | — |
+  | 5.8.3 | CJS / ESM | ✅ / ✅ | ❌ TS6046 (unknown option) / ❌ | ❌ TS1479 / ✅ | ✅ / ✅ |
+  | 5.9.3 | CJS / ESM | ✅ / ✅ | ✅ / ✅ | ❌ TS1479 / ✅ | ✅ / ✅ |
+  | 6.0.3 | CJS / ESM | ✅ / ✅ | ✅ / ✅ | ❌ TS1479 / ✅ | ✅ / ✅ |
+
+  **No error anywhere came from our type files or from Playwright's.** Every failure is a consumer setting.
+- **Type resolution:**
+  - Both subpaths resolve to `dist/*/index.d.ts` under `nodenext` and `bundler`.
+  - Our type files bind to the *consumer's* Playwright. TypeScript's package ID shows `+@playwright/test@1.60.0` or `1.65.1`, so the peer dependency works.
+  - Declaration maps point at the shipped `src/`.
+- **Publish checks:**
+  - `publint` 0.3.25 is clean.
+  - `attw` 0.18.5 passes with `--profile esm-only`. Its default profile still flags `node10` and "node16 from CJS". That's because attw checks with its bundled TS 5.6, which predates `require()` of ESM; the TS ≥5.8 rows above show real CJS consumers type-check.
+  - The emitted `dist/*.js` contains no reference to `@playwright/test`.
+
+### Updates to the decisions above
+- **Item 4 (consumer TypeScript minimum) is now verified, not just taken from release notes:**
+  - CJS + `nodenext` needs **TS ≥5.8**: 5.7 fails with TS1479, and 5.8 passes.
+  - `module: node20` needs **TS ≥5.9**: 5.8 rejects it with TS6046.
+  - CJS projects using `bundler` work even on 5.7.
+  - ESM projects work on 5.7 and later.
+- **Required test 2** (`skipLibCheck: false` on Playwright 1.60 and latest) **passes for the stub.** It stays required in CI, because the stub imports only `TestInfo` and the real modules will use more Playwright types.
+- **Required test 3** (TS 5.8 and 5.9) **passes.** Keep it in CI to catch regressions.
+
+### Still open
+- **Node 22.12.0, latest 22 and latest 24 are untested.** They aren't installed locally, so this includes whether 22.12.0 prints the `require(esm)` warning. Required test 1 still has to run in CI.
+- **Linux and macOS are untested.**
+- **Playwright 1.61–1.64 are untested.**
+
+### Tooling note
+A globally installed TypeScript can be picked up by `npx tsc` in a folder without a local install; it happened once during these runs. Project scripts must call the workspace's local `tsc`.
