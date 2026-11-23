@@ -5,4 +5,6 @@ playwright-report/
 blob-report/
 *.tsbuildinfo
 *.tgz
+# Session files (storageState, tokens): secrets. See ADR 0004.
+.auth/
 .env

@@ -1,0 +1,16 @@
+{
+  "name": "spike-s4-sessions",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "creds": "node gen-creds.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^22",
+    "@typescript/native": "npm:typescript@7.0.2",
+    "fflate": "0.8.3",
+    "typescript": "npm:@typescript/typescript6@6.0.2"
+  }
+}
