@@ -65,3 +65,56 @@ The runtime works in every case. These are type-check failures only, and Playwri
 ## Open items
 - **Node floor not verified locally.** Only Node 26 is installed. `require(esm)` without warnings on Node 22.12 / 24.x must be proven in the CI matrix (`22.12.0`, `24.x`, `26.x`) before the first release.
 - **npm scope.** The names `@qa-cortex/core`, `/tsconfig` and `/eslint-config` are free, but no `qa-cortex` org exists on npm yet. Someone has to create it to reserve the scope.
+
+## Addendum: compatibility review (2026-11-23)
+This section records the Step 3 review. ESM-only is **retained**.
+
+### Corrections to the results above
+- **Compiler.** The type matrix was re-run with **TypeScript 6.0.3** (ADR 0005) and gave identical results for `node16`, `node20`, `nodenext` and `bundler`. In TS 6, `node10` is deprecated (TS5107) rather than removed, and still can't resolve subpaths.
+- **Our own type files were never checked.** Every consumer tsconfig had `skipLibCheck: true`. The matrix proves resolution and usage, not that our `.d.ts` files compile under each setting.
+- **The Playwright 1.60 consumers were only run, never type-checked.**
+- **Every run was on Node 26.13.1, on Windows.**
+
+### Node minimum and why
+- **Minimum: Node `>=22.12`.**
+- **Why:** Node 20 is end-of-life. Playwright's docs list "latest 22.x, 24.x or 26.x". `require(esm)` is unflagged from 22.12.0.
+- **Source:** official docs, not runs.
+  - `require(esm)` has been unflagged since 22.12.0.
+  - Its default ExperimentalWarning was removed in **22.13.0** and 23.5.0. So 22.12.0 probably prints a one-time warning in CJS projects, which is cosmetic.
+  - It is no longer experimental from 25.4.0. Node 24 includes the 23.5 change, so no warning there.
+- Playwright's own `engines` field (`>=20` in 1.65, `>=18` in 1.60) is wider than its documented support. We follow the docs.
+- `engines` only produces a warning from npm; it doesn't enforce anything. Raise the minimum to `>=22.13` only if the CI matrix shows the 22.12.0 warning matters.
+
+### Additional decisions
+1. **Use `default`, never `import`, as the runtime condition in `exports`.** `require()` of ESM matches `require`/`default`, so an `import`-only map breaks CJS users. Use no `main`, `module`, top-level `types` or `typesVersions`.
+2. **Add subpaths only as modules ship;** don't reserve future ones.
+3. **Core only ever does `import type` from `@playwright/test`.** Fixtures and the `playwright` object are passed in by the user. This makes a second Playwright copy impossible (Playwright throws when loaded twice), and CI checks `dist` for runtime imports.
+4. **Minimum TypeScript for consumers:**
+   - CJS projects need TS **≥5.8**, because `nodenext` only accepts `require()` of ESM from 5.8, and `node20` arrives in 5.9.
+   - ESM projects: any supported 5.x.
+   - These floors come from TypeScript release notes, not runs; CI must confirm them.
+5. **Package manifest for `@qa-cortex/core`:**
+   - `"type": "module"`
+   - `exports` with `types` + `default` per subpath, plus `./package.json`
+   - `files: ["dist", "src"]`
+   - `sideEffects: false`
+   - `engines.node >=22.12`
+   - `peerDependencies: { "@playwright/test": ">=1.60.0 <2" }`
+   - `dependencies: { "zod": "^4.6.7" }`
+   - `publishConfig: { access: "public", provenance: true }`
+
+### Required tests (foundation CI, before the first release)
+1. **Node versions:** CJS and ESM consumer smoke tests on Node 22.12.0, latest 22, latest 24 and 26. Record whether 22.12.0 prints the warning.
+2. **Playwright versions:** type-check consumers on Playwright 1.60.0 and latest with `skipLibCheck: false`.
+3. **TypeScript floor:** a CJS + `nodenext` consumer on TS 5.8 and 5.9.
+4. **Platforms:** Linux and Windows runners.
+5. **Publish checks:** `publint` and `attw --pack --profile esm-only` on the real tarball.
+6. **Guards:**
+   - `require()` of every subpath (catches top-level await)
+   - no runtime `@playwright/test` import in `dist`
+7. **Optional:** a scheduled run against Playwright `@next`.
+
+### Known risks
+- **Our type files depend on Playwright's types.** A type change in any minor release can break compiles while the code still runs. Keep Playwright type imports minimal, and prefer `Pick<>`-style structural types.
+- **The peer range covers more than we test.** Playwright 1.61–1.64 are assumed to work.
+- **Playwright 2.** The `<2` cap gives install warnings or `ERESOLVE` until we release.
