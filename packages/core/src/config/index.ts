@@ -11,7 +11,7 @@ export { coreSchema, type ConfigSchema, type CoreConfig, type CoreSchema } from 
 export {
   DEFAULT_PROFILE,
   PROFILE_ENV_VAR,
-  defineConfig,
+  defineQaConfig,
   loadConfig,
   type ConfigDefinition,
   type ConfigDefinitionInput,

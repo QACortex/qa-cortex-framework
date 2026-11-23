@@ -1,5 +1,5 @@
 // loadConfig() behaviour (ported from spike S2, adapted to QA_CORTEX_PROFILE and the
-// single-signature defineConfig). Runs against the built package through its public name.
+// single-signature defineQaConfig). Runs against the built package through its public name.
 import { expect, test } from '@playwright/test';
 import {
   ConfigError,
@@ -7,17 +7,30 @@ import {
   PROFILE_ENV_VAR,
   RESERVED_NAMESPACES,
   coreSchema,
-  defineConfig,
+  defineQaConfig,
   isReservedNamespace,
   loadConfig,
   z,
 } from '@qa-cortex/core/config';
 
-const def = defineConfig({
+// A project-style extension with a nested object that has defaults, used to cover nested
+// defaults (prefault), nested overlays, nested errors and nested freezing. coreSchema itself
+// has no nested defaults any more (ADR 0002 addendum: no Playwright settings in core).
+const schema = coreSchema.extend({
+  app: z
+    .strictObject({
+      tenant: z.string().default('acme'),
+      pageSize: z.number().int().positive().default(25),
+    })
+    .prefault({}),
+});
+
+const def = defineQaConfig({
+  schema,
   base: { baseURL: 'http://localhost:3000' },
   profiles: {
     local: {},
-    staging: { baseURL: 'https://staging.example.test', timeouts: { action: 5_000 } },
+    staging: { baseURL: 'https://staging.example.test', app: { pageSize: 50 } },
     prod: { baseURL: 'https://example.com', production: true },
   },
 });
@@ -39,20 +52,25 @@ test.describe('precedence: defaults → base → profile → overrides', () => {
     expect(loadConfig(def, noEnv)).toEqual({
       baseURL: 'http://localhost:3000',
       production: false,
-      timeouts: { action: 10_000, navigation: 30_000 },
+      app: { tenant: 'acme', pageSize: 25 },
       profile: 'local',
     });
+  });
+
+  test('the core schema alone yields only core fields', () => {
+    const core = defineQaConfig({ base: { baseURL: 'http://localhost:3000' }, profiles: { local: {} } });
+    expect(loadConfig(core, noEnv)).toEqual({ baseURL: 'http://localhost:3000', production: false, profile: 'local' });
   });
 
   test('profile overrides base; a partial nested overlay keeps the other defaults', () => {
     const cfg = loadConfig(def, { ...noEnv, profile: 'staging' });
     expect(cfg.baseURL).toBe('https://staging.example.test');
-    expect(cfg.timeouts).toEqual({ action: 5_000, navigation: 30_000 });
+    expect(cfg.app).toEqual({ tenant: 'acme', pageSize: 50 });
   });
 
   test('overrides win over the profile', () => {
-    const cfg = loadConfig(def, { ...noEnv, profile: 'staging', overrides: { timeouts: { action: 1 } } });
-    expect(cfg.timeouts).toEqual({ action: 1, navigation: 30_000 });
+    const cfg = loadConfig(def, { ...noEnv, profile: 'staging', overrides: { app: { pageSize: 1 } } });
+    expect(cfg.app).toEqual({ tenant: 'acme', pageSize: 1 });
   });
 
   test('loading is deterministic and leaves the definition untouched', () => {
@@ -110,15 +128,16 @@ test.describe('profile selection', () => {
 
 test.describe('validation errors', () => {
   test('all issues are reported at once, each with the layer that caused it', () => {
-    const bad = defineConfig({
+    const bad = defineQaConfig({
+      schema,
       // @ts-expect-error deliberate typo, to exercise the unknown-key path at runtime
-      base: { timeouts: { action: 5_000 }, baseURl: 'http://x.test' },
-      profiles: { staging: { timeouts: { action: -1 } } },
+      base: { app: { pageSize: 25 }, baseURl: 'http://x.test' },
+      profiles: { staging: { app: { pageSize: -1 } } },
     });
     const err = catchConfigError(() => loadConfig(bad, { ...noEnv, profile: 'staging' }));
     expect(err.issues).toEqual([
       { path: 'baseURL', message: expect.stringContaining('expected string') as unknown, source: 'not set in base, profile "staging"' },
-      { path: 'timeouts.action', message: expect.stringContaining('>0') as unknown, source: 'profile "staging"' },
+      { path: 'app.pageSize', message: expect.stringContaining('>0') as unknown, source: 'profile "staging"' },
       { path: 'baseURl', message: expect.stringContaining('unknown key') as unknown, source: 'base' },
     ]);
     expect(err.message.split('\n')[0]).toBe('Invalid QA Cortex config (profile "staging"):');
@@ -126,13 +145,33 @@ test.describe('validation errors', () => {
 
   test('nested typos are caught (strict objects at every depth)', () => {
     // @ts-expect-error deliberate nested typo
-    const typo = defineConfig({ base: { baseURL: 'http://x.test' }, profiles: { local: { timeouts: { actoin: 1 } } } });
+    const typo = defineQaConfig({ schema, base: { baseURL: 'http://x.test' }, profiles: { local: { app: { pagesize: 1 } } } });
     const err = catchConfigError(() => loadConfig(typo, noEnv));
-    expect(err.issues).toEqual([expect.objectContaining({ path: 'timeouts.actoin', source: 'profile "local"' })]);
+    expect(err.issues).toEqual([expect.objectContaining({ path: 'app.pagesize', source: 'profile "local"' })]);
+  });
+
+  test('timeouts is not part of the core schema (Playwright owns timeouts)', () => {
+    // @ts-expect-error removed from coreSchema before release
+    const legacy = defineQaConfig({ base: { baseURL: 'http://x.test', timeouts: { action: 5_000 } }, profiles: { local: {} } });
+    const err = catchConfigError(() => loadConfig(legacy, noEnv));
+    expect(err.issues).toEqual([expect.objectContaining({ path: 'timeouts', message: expect.stringContaining('unknown key'), source: 'base' })]);
+  });
+
+  test('an unknown key holding an object names every layer that set it', () => {
+    // Regression: provenance records leaves, so an object-valued unknown key used to report
+    // "not set in ..." even though base and the profile had both set it.
+    const withExtra = defineQaConfig({
+      // @ts-expect-error unknown root key holding an object
+      base: { baseURL: 'http://x.test', extra: { a: 1 } },
+      // @ts-expect-error same unknown key in the profile
+      profiles: { local: { extra: { b: 2 } } },
+    });
+    const err = catchConfigError(() => loadConfig(withExtra, noEnv));
+    expect(err.issues).toEqual([expect.objectContaining({ path: 'extra', source: 'base, profile "local"' })]);
   });
 
   test('messages never echo config values (they may be secrets)', () => {
-    const leaky = defineConfig({ base: { baseURL: 'hunter2-SECRET-not-a-url' }, profiles: { local: {} } });
+    const leaky = defineQaConfig({ base: { baseURL: 'hunter2-SECRET-not-a-url' }, profiles: { local: {} } });
     const err = catchConfigError(() => loadConfig(leaky, noEnv));
     expect(err.message).not.toContain('SECRET');
     expect(JSON.stringify(err.issues)).not.toContain('SECRET');
@@ -148,14 +187,14 @@ test.describe('validation errors', () => {
   });
 
   test('async refinements are rejected loudly (loading must stay synchronous)', () => {
-    const asyncSchema = coreSchema.extend({ app: z.string().refine(async () => Promise.resolve(true)) });
-    const d = defineConfig({ schema: asyncSchema, base: { baseURL: 'http://x.test', app: 'a' }, profiles: { local: {} } });
+    const asyncSchema = coreSchema.extend({ tag: z.string().refine(async () => Promise.resolve(true)) });
+    const d = defineQaConfig({ schema: asyncSchema, base: { baseURL: 'http://x.test', tag: 'a' }, profiles: { local: {} } });
     expect(() => loadConfig(d, noEnv)).toThrow(/async|Promise/i);
   });
 
   test('"profile" is reserved for the selected profile name', () => {
     const clash = coreSchema.extend({ profile: z.string().default('mine') });
-    const d = defineConfig({ schema: clash, base: { baseURL: 'http://x.test' }, profiles: { local: {} } });
+    const d = defineQaConfig({ schema: clash, base: { baseURL: 'http://x.test' }, profiles: { local: {} } });
     const err = catchConfigError(() => loadConfig(d, noEnv));
     expect(err.issues).toEqual([expect.objectContaining({ path: 'profile', source: 'schema' })]);
   });
@@ -163,17 +202,17 @@ test.describe('validation errors', () => {
 
 test.describe('immutable result', () => {
   test('plain objects and arrays are deep-frozen; class instances are left untouched', () => {
-    const schema = coreSchema.extend({ app: z.strictObject({ tags: z.array(z.string()), started: z.date() }) });
+    const withData = coreSchema.extend({ data: z.strictObject({ tags: z.array(z.string()), started: z.date() }) });
     const started = new Date(0);
     const cfg = loadConfig(
-      defineConfig({ schema, base: { baseURL: 'http://x.test', app: { tags: ['a'], started } }, profiles: { local: {} } }),
+      defineQaConfig({ schema: withData, base: { baseURL: 'http://x.test', data: { tags: ['a'], started } }, profiles: { local: {} } }),
       noEnv,
     );
     expect(Object.isFrozen(cfg)).toBe(true);
-    expect(Object.isFrozen(cfg.app)).toBe(true);
-    expect(Object.isFrozen(cfg.app.tags)).toBe(true);
-    expect(cfg.app.started).toBe(started);
-    expect(Object.isFrozen(cfg.app.started)).toBe(false);
+    expect(Object.isFrozen(cfg.data)).toBe(true);
+    expect(Object.isFrozen(cfg.data.tags)).toBe(true);
+    expect(cfg.data.started).toBe(started);
+    expect(Object.isFrozen(cfg.data.started)).toBe(false);
   });
 
   test('mutation attempts throw (ES modules run in strict mode)', () => {
@@ -182,9 +221,10 @@ test.describe('immutable result', () => {
       (cfg as { baseURL: string }).baseURL = 'http://evil.test';
     }).toThrow(TypeError);
     expect(() => {
-      (cfg.timeouts as { action: number }).action = 1;
+      (cfg.app as { pageSize: number }).pageSize = 1;
     }).toThrow(TypeError);
     expect(cfg.baseURL).toBe('http://localhost:3000');
+    expect(cfg.app.pageSize).toBe(25);
   });
 });
 
@@ -200,7 +240,7 @@ test.describe('reserved namespaces (api, ai)', () => {
 
   test('core accepts anything under api/ai without validating it', () => {
     const cfg = loadConfig(
-      defineConfig({ base: { baseURL: 'http://x.test', api: { anything: [1, 'two'] }, ai: 42 }, profiles: { local: {} } }),
+      defineQaConfig({ base: { baseURL: 'http://x.test', api: { anything: [1, 'two'] }, ai: 42 }, profiles: { local: {} } }),
       noEnv,
     );
     expect(cfg.api).toEqual({ anything: [1, 'two'] });
@@ -209,19 +249,19 @@ test.describe('reserved namespaces (api, ai)', () => {
 
   test('an extension replaces a reserved namespace with a real schema, with provenance', () => {
     const apiSchema = z.strictObject({ baseURL: z.url(), retries: z.number().int().min(0).default(0) });
-    const schema = coreSchema.extend({ api: apiSchema });
-    const d = defineConfig({ schema, base: { baseURL: 'http://x.test', api: { baseURL: 'http://api.x.test' } }, profiles: { local: {} } });
+    const withApi = coreSchema.extend({ api: apiSchema });
+    const d = defineQaConfig({ schema: withApi, base: { baseURL: 'http://x.test', api: { baseURL: 'http://api.x.test' } }, profiles: { local: {} } });
     expect(loadConfig(d, noEnv).api).toEqual({ baseURL: 'http://api.x.test', retries: 0 });
     const err = catchConfigError(() => loadConfig({ ...d, profiles: { local: { api: { retries: -1 } } } }, noEnv));
     expect(err.issues).toEqual([expect.objectContaining({ path: 'api.retries', source: 'profile "local"' })]);
   });
 
   test('extending keeps the root strict', () => {
-    const schema = coreSchema.extend({ app: z.strictObject({ tenant: z.string() }) });
+    const withTenant = coreSchema.extend({ tenant: z.string() });
     const err = catchConfigError(() =>
       loadConfig(
         // @ts-expect-error unknown root key
-        defineConfig({ schema, base: { baseURL: 'http://x.test', app: { tenant: 't' }, extra: 1 }, profiles: { local: {} } }),
+        defineQaConfig({ schema: withTenant, base: { baseURL: 'http://x.test', tenant: 't', extra: 1 }, profiles: { local: {} } }),
         noEnv,
       ),
     );

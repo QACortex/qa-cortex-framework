@@ -15,7 +15,7 @@ const PROFILE_KEY = 'profile';
 /** What a base, profile or override layer may contain for schema S. */
 export type ConfigOverlay<S extends ConfigSchema> = DeepPartial<z.input<S>>;
 
-/** A complete, typed config definition, as returned by defineConfig(). */
+/** A complete, typed config definition, as returned by defineQaConfig(). */
 export interface ConfigDefinition<S extends ConfigSchema = CoreSchema> {
   readonly schema: S;
   readonly base?: ConfigOverlay<S> | undefined;
@@ -25,7 +25,7 @@ export interface ConfigDefinition<S extends ConfigSchema = CoreSchema> {
   readonly defaultProfile?: string | undefined;
 }
 
-/** Input to defineConfig(): like ConfigDefinition, but `schema` may be omitted (core schema). */
+/** Input to defineQaConfig(): like ConfigDefinition, but `schema` may be omitted (core schema). */
 export interface ConfigDefinitionInput<S extends ConfigSchema> extends Omit<ConfigDefinition<S>, 'schema'> {
   readonly schema?: S | undefined;
 }
@@ -56,7 +56,7 @@ export interface LoadOptions<S extends ConfigSchema> {
  * `coreSchema`; omit it to use `coreSchema`. The definition is returned as-is (not frozen);
  * nothing is validated until loadConfig().
  */
-export function defineConfig<S extends ConfigSchema = CoreSchema>(definition: ConfigDefinitionInput<S>): ConfigDefinition<S> {
+export function defineQaConfig<S extends ConfigSchema = CoreSchema>(definition: ConfigDefinitionInput<S>): ConfigDefinition<S> {
   // When `schema` is omitted, S falls back to its default (CoreSchema), so this cast is exact.
   return { ...definition, schema: definition.schema ?? (coreSchema as unknown as S) };
 }

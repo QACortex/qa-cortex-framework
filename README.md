@@ -47,14 +47,14 @@ profile → `overrides`. The profile comes from `loadConfig({ profile })`, then 
 
 ```ts
 // qa.config.ts
-import { coreSchema, defineConfig, z, type ConfigOf } from '@qa-cortex/core/config';
+import { coreSchema, defineQaConfig, z, type ConfigOf } from '@qa-cortex/core/config';
 
 export const schema = coreSchema.extend({
   app: z.strictObject({ tenant: z.string() }), // use the re-exported `z`
 });
 export type AppConfig = ConfigOf<typeof schema>;
 
-export const qaConfig = defineConfig({
+export const qaConfig = defineQaConfig({
   schema, // omit to use coreSchema as-is
   base: { baseURL: 'http://localhost:3000', app: { tenant: 'acme' } },
   profiles: {
@@ -81,8 +81,17 @@ export default defineConfig({
   (`[profile "staging"]`, `[not set in base, profile "staging"]`). Values are never printed.
 - The result is deep-frozen; `profile` holds the selected profile name.
 - `api` and `ai` are reserved top-level sections for future packages.
-- Both packages export a `defineConfig`. In a file that uses both, alias one of them,
-  e.g. `import { defineConfig as defineQaConfig } from '@qa-cortex/core/config'`.
+- The core schema holds only `baseURL`, `production`, `api` and `ai`. Playwright settings
+  (timeouts, retries, workers) stay in Playwright's config. To vary one per profile, add
+  your own field and map it explicitly:
+
+  ```ts
+  const schema = coreSchema.extend({
+    timeouts: z.strictObject({ action: z.number().int().nonnegative() }).optional(),
+  });
+  // playwright.config.ts
+  use: { baseURL: qa.baseURL, actionTimeout: qa.timeouts?.action },
+  ```
 
 ## Key decisions
 

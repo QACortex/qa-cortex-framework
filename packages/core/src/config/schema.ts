@@ -9,19 +9,17 @@ import { z } from 'zod';
  *
  * `api` and `ai` are RESERVED namespaces (see RESERVED_NAMESPACES): placeholders that accept
  * anything. A later package replaces one with a real schema via `.extend({ api: apiSchema })`.
+ *
+ * Deliberately no Playwright settings (timeouts, retries, workers...): Playwright owns those.
+ * A project that wants them per profile adds its own field and maps it into `use` explicitly.
+ * For nested objects with defaults, use `.prefault({})`: in Zod 4, `.default({})` skips the
+ * inner defaults.
  */
 export const coreSchema = z.strictObject({
-  /** Base URL of the application under test for the selected profile. */
+  /** Base URL of the application under test for the selected profile. Map it into `use.baseURL`. */
   baseURL: z.url(),
   /** Marks a production profile. Read by other modules (for example the Production guard). */
   production: z.boolean().default(false),
-  timeouts: z
-    .strictObject({
-      action: z.number().int().positive().default(10_000),
-      navigation: z.number().int().positive().default(30_000),
-    })
-    // Zod 4: `.default({})` would skip the inner defaults; `.prefault({})` parses `{}` through the schema.
-    .prefault({}),
   api: z.unknown().optional(),
   ai: z.unknown().optional(),
 });

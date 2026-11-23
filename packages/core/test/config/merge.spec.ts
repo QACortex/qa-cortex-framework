@@ -1,14 +1,14 @@
 // Merge rules (ADR 0002), exercised through the public API. The merge itself is internal,
 // so every case goes through loadConfig() with a permissive `extra` section.
 import { expect, test } from '@playwright/test';
-import { ConfigError, coreSchema, defineConfig, loadConfig, z, type ConfigOverlay } from '@qa-cortex/core/config';
+import { ConfigError, coreSchema, defineQaConfig, loadConfig, z, type ConfigOverlay } from '@qa-cortex/core/config';
 
 const schema = coreSchema.extend({ extra: z.unknown().optional() });
 type Overlay = ConfigOverlay<typeof schema>;
 
 /** Load with base/profile/overrides carrying only `extra` (baseURL supplied in base). */
 function mergeExtra(base: unknown, profile?: unknown, overrides?: unknown): unknown {
-  const def = defineConfig({
+  const def = defineQaConfig({
     schema,
     base: { baseURL: 'http://localhost:3000', extra: base },
     profiles: { local: profile === undefined ? {} : { extra: profile } },
@@ -78,7 +78,7 @@ test.describe('merge rules', () => {
   });
 
   test('a layer that is not a plain object is rejected', () => {
-    const def = defineConfig({ schema, base: [1, 2] as unknown as Overlay, profiles: { local: {} } });
+    const def = defineQaConfig({ schema, base: [1, 2] as unknown as Overlay, profiles: { local: {} } });
     expect(() => loadConfig(def, { env: {} })).toThrow(/layer base must be a plain object/);
   });
 });

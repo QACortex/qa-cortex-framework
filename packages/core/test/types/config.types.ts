@@ -3,10 +3,10 @@
 // an error and every positive assignment really type-checks.
 //
 // ADR 0005: TypeScript 6 reports several errors inside ONE call as a single error at the
-// call, so each invalid case gets its own defineConfig() call.
+// call, so each invalid case gets its own defineQaConfig() call.
 import {
   coreSchema,
-  defineConfig,
+  defineQaConfig,
   loadConfig,
   z,
   type ConfigDefinition,
@@ -24,7 +24,7 @@ const schema = coreSchema.extend({
 });
 type AppConfig = ConfigOf<typeof schema>;
 
-const appDef = defineConfig({
+const appDef = defineQaConfig({
   schema,
   base: { baseURL: 'http://localhost:3000', app: { tenant: 'acme' } },
   profiles: { local: {}, staging: { baseURL: 'https://staging.example.test', app: { features: ['search'] } } },
@@ -34,7 +34,7 @@ const appDef = defineConfig({
 const cfg = loadConfig(appDef);
 const tenant: string = cfg.app.tenant;
 const features: readonly ('search' | 'checkout')[] = cfg.app.features;
-const action: number = cfg.timeouts.action;
+const baseURL: string = cfg.baseURL;
 const production: boolean = cfg.production;
 const profile: string = cfg.profile;
 const reserved: unknown = cfg.api;
@@ -42,11 +42,13 @@ const annotated: AppConfig = loadConfig(appDef); // the named alias is assignabl
 const typedDef: ConfigDefinition<typeof schema> = appDef;
 
 // ---------------------------------------------------------------- inference: schema omitted
-const coreDef = defineConfig({ base: { baseURL: 'http://x.test' }, profiles: { local: {} } });
+const coreDef = defineQaConfig({ base: { baseURL: 'http://x.test' }, profiles: { local: {} } });
 const coreTyped: ConfigDefinition<CoreSchema> = coreDef; // omitting `schema` means coreSchema
 const coreCfg: LoadedConfig = loadConfig(coreDef);
 // @ts-expect-error core config has no `app` section
 void coreCfg.app;
+// @ts-expect-error core config has no `timeouts` section (Playwright owns timeouts)
+void coreCfg.timeouts;
 
 // ---------------------------------------------------------------- the result is deeply readonly
 // @ts-expect-error top-level property is readonly
@@ -59,44 +61,44 @@ cfg.app.features.push('search');
 cfg.profile = 'x';
 
 // ---------------------------------------------------------------- one invalid case per call
-defineConfig({
+defineQaConfig({
   schema,
   base: { baseURL: 'http://x.test', app: { tenant: 'a' } },
-  // @ts-expect-error wrong type in a profile (string where a number is expected)
-  profiles: { a: { timeouts: { action: '5s' } } },
+  // @ts-expect-error wrong type in a profile (number where a string is expected)
+  profiles: { a: { app: { tenant: 42 } } },
 });
 
-defineConfig({
+defineQaConfig({
   schema,
   base: { baseURL: 'http://x.test', app: { tenant: 'a' } },
   // @ts-expect-error enum member that does not exist
   profiles: { b: { app: { features: ['refunds'] } } },
 });
 
-defineConfig({
+defineQaConfig({
   schema,
   base: { baseURL: 'http://x.test', app: { tenant: 'a' } },
   // @ts-expect-error typo in a nested key
   profiles: { c: { app: { tennant: 'x' } } },
 });
 
-defineConfig({
+defineQaConfig({
   // @ts-expect-error typo in a root key of the base layer
   base: { baseURl: 'http://x.test' },
   profiles: { local: {} },
 });
 
-defineConfig({
+defineQaConfig({
   base: { baseURL: 'http://x.test' },
   // @ts-expect-error profiles must be an object of overlays, not an array
   profiles: [{}],
 });
 
 // @ts-expect-error a schema without baseURL breaks the core contract other modules rely on
-defineConfig({ schema: coreSchema.omit({ baseURL: true }), profiles: { local: {} } });
+defineQaConfig({ schema: coreSchema.omit({ baseURL: true }), profiles: { local: {} } });
 
 // @ts-expect-error a schema that is not an object schema at all
-defineConfig({ schema: z.string(), profiles: { local: {} } });
+defineQaConfig({ schema: z.string(), profiles: { local: {} } });
 
 // @ts-expect-error overrides are typed against the schema too
 loadConfig(appDef, { overrides: { nope: true } });
@@ -107,6 +109,6 @@ loadConfig(appDef, { overrides: { production: 'yes' } });
 // ---------------------------------------------------------------- deliberate limitation (ADR 0002)
 // `base` may be incomplete because profiles can fill it in, so a required key missing from
 // every layer is caught by loadConfig() at run time, not by the compiler. This compiles:
-defineConfig({ schema, base: {}, profiles: { local: {} } });
+defineQaConfig({ schema, base: {}, profiles: { local: {} } });
 
-export { action, annotated, coreTyped, features, production, profile, reserved, tenant, typedDef };
+export { annotated, baseURL, coreTyped, features, production, profile, reserved, tenant, typedDef };

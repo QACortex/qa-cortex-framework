@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { sourceOf, type Provenance } from './merge.js';
 
 export interface ConfigIssue {
-  /** Dot path, e.g. "timeouts.action". Empty string for the root. */
+  /** Dot path, e.g. "api.retries". Empty string for the root. */
   readonly path: string;
   readonly message: string;
   /** Layer that set the value, or a "not set" explanation. Never contains the value itself. */

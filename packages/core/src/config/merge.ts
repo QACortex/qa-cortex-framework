@@ -83,11 +83,19 @@ function dropSubtree(provenance: Map<string, string>, path: readonly string[]): 
   for (const key of provenance.keys()) if (key.startsWith(prefix)) provenance.delete(key);
 }
 
-/** Layer that set `path` or its nearest ancestor; undefined if no layer touched it. */
+/**
+ * Layer(s) responsible for `path`: the layer that set it or its nearest ancestor; failing
+ * that, every layer that set something below it (an object value is recorded by its leaves,
+ * so an unknown key holding an object is found this way). Undefined if no layer touched it.
+ */
 export function sourceOf(provenance: Provenance, path: readonly PropertyKey[]): string | undefined {
   for (let i = path.length; i > 0; i--) {
     const hit = provenance.get(path.slice(0, i).map(String).join('.'));
     if (hit) return hit;
   }
-  return undefined;
+  if (path.length === 0) return undefined;
+  const prefix = `${path.map(String).join('.')}.`;
+  const layers = new Set<string>();
+  for (const [key, layer] of provenance) if (key.startsWith(prefix)) layers.add(layer);
+  return layers.size > 0 ? [...layers].join(', ') : undefined;
 }

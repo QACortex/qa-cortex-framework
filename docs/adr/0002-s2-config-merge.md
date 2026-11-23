@@ -1,6 +1,6 @@
 # ADR 0002 — S2 config merge: layers, Zod 4 validation, frozen typed result
 
-- Status: accepted (spike S2, 2026-11-23)
+- Status: accepted (spike S2, 2026-11-23). Amended by the addendum at the end (production implementation and API review), which supersedes the API names and core schema fields listed under "Locked API".
 - Spike code: `spikes/s2-config-merge/` (prototype of `@qa-cortex/core/config`; module 1 starts from it)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2, Zod 4.6.7, `@playwright/test` 1.65.1
 - Evidence:
@@ -115,3 +115,56 @@ The merge is our own code, about 60 lines, with no dependency. It records which 
 - **`profile` key.** It's added to the result after validation. Module 1 should reserve it, so a user extension can't define a `profile` key.
 - **Error printing.** Playwright prints `ConfigError`'s own enumerable fields after the message, which is noisy. Consider making `issues` non-enumerable, or overriding `[util.inspect.custom]`.
 - **Ancestor provenance.** It's approximate. A default-filled leaf under an object a layer set (for example `timeouts.navigation` when only `timeouts.action` was set) is reported as coming from that layer. Acceptable for error messages.
+
+## Addendum: production implementation and API review (2026-11-23)
+This section records Step 4B (implementation in `packages/core/src/config/`, commit `6801925`) and the Step 4C API review. The merge rules, provenance, validation, error format and freeze rules above are unchanged.
+
+### Final public API (`@qa-cortex/core/config`)
+```ts
+export { z } from 'zod';                    // users extend with THIS z
+export const coreSchema;                    // strict: baseURL, production, api?, ai?
+export function defineQaConfig(def): ConfigDefinition<S>;   // ONE signature; schema optional → coreSchema
+export function loadConfig(def, { profile?, overrides?, env? }?): LoadedConfig<z.output<S>>;
+export class ConfigError extends Error { profile; issues: { path, message, source }[] }  // non-enumerable
+export const RESERVED_NAMESPACES /* ['api','ai'] */, isReservedNamespace;
+export const PROFILE_ENV_VAR = 'QA_CORTEX_PROFILE', DEFAULT_PROFILE = 'local';
+export type ConfigOf<S>, LoadedConfig<T>, ConfigDefinition<S>, ConfigDefinitionInput<S>, ConfigOverlay<S>,
+  ConfigSchema, CoreSchema, CoreConfig, ConfigIssue, LoadOptions<S>, ReservedNamespace, DeepPartial, DeepReadonly;
+```
+
+### Changes from the "Locked API" above
+| Spike S2 | Production | Why |
+|---|---|---|
+| `defineConfig` (two overloads) | **`defineQaConfig`**, one generic signature | Playwright also exports `defineConfig`, the import every user already has. A shared name forces aliasing and invites wrong auto-imports. One signature gives exact error positions on TypeScript 6 (ADR 0005). `loadConfig` keeps its name: Playwright has no `loadConfig`. |
+| env var `QA_PROFILE` | **`QA_CORTEX_PROFILE`** | Unambiguous. Closes the open item. |
+| `coreSchema.timeouts` (`action` 10 s, `navigation` 30 s) | **removed** | See "Timeouts" below. |
+| `configOption()` / `configFixtures()` helpers | **not shipped** | A plain Playwright option fixture does the same job with no QA Cortex abstraction (shown by the nested Playwright integration test), and it drops the spike's `as never` cast. |
+| `profile` result key unguarded | **reserved**: a schema that outputs `profile` gets a `ConfigError` | Closes the open item. |
+| `ConfigError` fields printed twice by Playwright | `issues`/`profile` **non-enumerable** and frozen | Closes the open item. |
+
+### Timeouts: why they're not in core
+- **They duplicated Playwright.** `timeouts.action` and `timeouts.navigation` mirrored `use.actionTimeout` and `use.navigationTimeout` under other names, and nothing in QA Cortex read them.
+- **They invited conflicting behaviour:**
+  - **Not wired into `use`:** setting the value silently did nothing.
+  - **Wired:** our defaults (10 s action) replaced Playwright's (action: 0, no limit) without the user choosing it.
+  - **Both set:** two sources of truth.
+- **The rule now:** core carries no Playwright settings. A project that wants a per-profile Playwright value extends the schema and maps it into `use` explicitly (README recipe).
+- **The core contract** is `baseURL`, `production`, `api?`, `ai?`.
+  - `baseURL` stays: it's the main per-profile value. It has no default and must be mapped into `use.baseURL` explicitly.
+  - `production` is QA Cortex's own setting (read by the Production guard).
+- **Compatibility:** nothing was published (`0.0.0`), so no deprecation alias or shim exists. A config that still sets `timeouts` now fails as an unknown key, which a test covers.
+
+### Evidence
+- **Runtime tests:** run against the built package through its public name. They cover:
+  - merge rules
+  - precedence (with nested defaults via a test-local extension)
+  - profile selection
+  - errors without secrets
+  - immutability
+  - reserved namespaces
+  - `timeouts` rejection
+  - a nested Playwright project (config flows from `playwright.config.ts` to workers; a bad profile fails fast)
+- **Type tests:** compile-only, with one invalid case per `defineQaConfig` call. A typo reports TS2561 ("did you mean…") at the misspelled key.
+
+### Still open
+- Ancestor provenance remains approximate, as noted above.
