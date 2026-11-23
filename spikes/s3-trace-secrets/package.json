@@ -1,0 +1,14 @@
+{
+  "name": "spike-s3-trace-secrets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "canaries": "node gen-canaries.mjs",
+    "scan": "node scan.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "^22",
+    "fflate": "0.8.3"
+  }
+}
