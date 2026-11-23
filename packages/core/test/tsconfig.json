@@ -1,0 +1,13 @@
+{
+  // Type-checks the tests against the BUILT package (imports go through the package's
+  // exports map, exactly as a consumer's would). Run after `tsc -b`.
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true
+  },
+  "include": ["."]
+}

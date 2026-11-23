@@ -1,0 +1,15 @@
+{
+  // Type-checks root tool configs (playwright.config.ts, eslint.config.js). Also used by
+  // ESLint as the default project for these files, which no package tsconfig includes.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["playwright.config.ts", "eslint.config.js"]
+}

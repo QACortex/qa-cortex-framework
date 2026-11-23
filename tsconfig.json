@@ -1,0 +1,5 @@
+{
+  // Solution file: `tsc -b` builds every referenced package in dependency order.
+  "files": [],
+  "references": [{ "path": "packages/core" }]
+}

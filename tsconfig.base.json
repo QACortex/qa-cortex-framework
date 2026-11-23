@@ -1,0 +1,26 @@
+{
+  // Shared compiler settings for every workspace package (ADR 0005, ADR 0001).
+  // Packages extend this and set their own rootDir/outDir.
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    // Set explicitly: TypeScript 6 defaults `types` to [] and `strict` to true (ADR 0005).
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    // Check third-party declarations too: our .d.ts files depend on Playwright's (ADR 0001).
+    "skipLibCheck": false,
+
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  }
+}
