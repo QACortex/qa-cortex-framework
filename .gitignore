@@ -1,10 +1,26 @@
-﻿node_modules/
+# Dependencies and build output
+node_modules/
 dist/
+*.tsbuildinfo
+*.tgz
+
+# Playwright output
 test-results/
 playwright-report/
 blob-report/
-*.tsbuildinfo
-*.tgz
-# Session files (storageState, tokens): secrets. See ADR 0004.
+
+# Secrets: session files (storageState, tokens; see ADR 0004) and environment files
 .auth/
 .env
+.env.*
+!.env.example
+
+# Local tool settings
+.claude/settings.local.json
+.idea/
+
+# Logs, coverage, OS files
+*.log
+coverage/
+.DS_Store
+Thumbs.db
