@@ -1,6 +1,6 @@
 # ADR 0000 — S0 toolchain: TypeScript 7 build, TypeScript 6 API for lint
 
-- Status: accepted (spike S0, 2026-11-23)
+- Status: superseded by [ADR 0005](0005-single-compiler-typescript-6.md) (toolchain decision). Findings below are kept as the historical record.
 - Spike code: `spikes/s0-toolchain/` (throwaway)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2, `@typescript/typescript6` 6.0.2 (resolves TS 6.0.3), ESLint 9.39.5, typescript-eslint 8.73.0, `@playwright/test` 1.65.1
 
