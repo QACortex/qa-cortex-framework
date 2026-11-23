@@ -1,0 +1,81 @@
+# Continuous integration for QA Cortex.
+#
+# One job on Ubuntu + Node.js 22 (the minimum supported major, engines ">=22.12").
+# The compatibility matrix (Node 24/26, Windows, Playwright 1.60 floor) comes later (Step 7B).
+#
+# What runs: the same npm scripts a contributor runs locally, in dependency order.
+# What does NOT run: the browser demos in examples/ (they visit public websites, and
+# examples/config-demo/tests/failure/ fails on purpose). `npm test` only runs
+# packages/*/test, and none of those tests start a browser, so no browsers are installed.
+#
+# Nothing is published or deployed from this workflow.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: read the repository, nothing else.
+permissions:
+  contents: read
+
+# One run per branch or PR; a newer push to a PR cancels the older run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Build, type-check, lint, test (Node 22, Ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Actions are pinned to full commit SHAs (supply-chain safety); the comment is the release.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (from package-lock.json)
+        run: npm ci
+
+      # Compiles @qa-cortex/core to dist/. Later steps import the built package.
+      - name: Build
+        run: npm run build
+
+      # Package tests, root tool configs and the examples, against the built package.
+      - name: Type-check
+        run: npm run typecheck
+
+      # Type-aware rules; needs the built type declarations.
+      - name: Lint
+        run: npm run lint
+
+      # packages/*/test only (no browsers needed; examples are excluded).
+      - name: Test
+        run: npm test
+
+      # Dry-run `npm pack` of @qa-cortex/core: checks every exports target is packaged.
+      - name: Validate package contents
+        run: npm run pack:check
+
+      # Test output (error context, nested-run traces) for diagnosing failures only.
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

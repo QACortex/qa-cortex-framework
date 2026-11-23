@@ -40,7 +40,11 @@ Run from the repository root:
 | `npm run typecheck` | Builds, then type-checks the tests, root tool configs and the examples against the built packages. |
 | `npm run lint` | Runs ESLint with type-aware rules (packages and examples). |
 | `npm test` | Builds, then runs the package tests with Playwright Test. |
+| `npm run pack:check` | After a build: dry-run `npm pack` of `@qa-cortex/core`; fails if an `exports` target, `LICENSE` or `package.json` would be missing, or if build caches or tests would be published. Nothing is published. |
 | `npm run clean` | Removes build output. |
+
+CI (`.github/workflows/ci.yml`) runs `npm ci`, then `build`, `typecheck`, `lint`, `test` and
+`pack:check` on Ubuntu with Node.js 22, for pushes and pull requests to `main`.
 
 `npm test` runs only `packages/*/test`. The browser tests in `examples/` visit public
 websites, so they are **not** part of the mandatory suite; run them from each example's
