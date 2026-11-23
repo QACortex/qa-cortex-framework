@@ -99,6 +99,35 @@ export default defineConfig({
   use: { baseURL: qa.baseURL, actionTimeout: qa.timeouts?.action },
   ```
 
+### Config in tests: `configFixtures()`
+
+Add the config fixtures to **your own** `test` with Playwright's `test.extend()`. QA Cortex
+never replaces `test` or `expect`.
+
+```ts
+// tests/fixtures.ts
+import { test as base } from '@playwright/test';
+import { configFixtures, type ConfigWorkerFixtures } from '@qa-cortex/core/config';
+import { qaConfig, type schema } from '../qa.config.js';
+
+export const test = base.extend<object, ConfigWorkerFixtures<typeof schema>>(configFixtures(qaConfig));
+
+// any spec
+test('uses the config', async ({ page, qaConfig }) => {
+  await page.goto('./');
+  // qaConfig is typed from your schema, frozen, and loaded once per worker
+});
+```
+
+| Fixture | Scope | What it is |
+|---|---|---|
+| `qaConfig` | worker | the validated config for this worker's profile |
+| `qaProfile` | worker option | profile for a Playwright project: `use: { qaProfile: 'staging' }`; unset means `QA_CORTEX_PROFILE`, then `local` |
+
+- Your own fixtures can depend on `qaConfig` by name, and the fixtures combine with `mergeTests()`.
+- `test.use({ qaProfile })` must sit at the top level of a spec file (Playwright rule for worker options), not inside `describe()`.
+- When projects use different profiles, derive each project's `baseURL` from the same profile. See [ADR 0006](docs/adr/0006-fixtures.md).
+
 ## Key decisions
 
 - **ESM-only.** Packages expose subpaths only (`@qa-cortex/core/config`), never the package root. CommonJS projects load them through `require()` of ESM, which needs Node 22.12+ and, for type-checking with `nodenext`, TypeScript 5.8+. See [ADR 0001](docs/adr/0001-s1-module-format.md).

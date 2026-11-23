@@ -2,33 +2,13 @@
 // (test/fixtures/pw-project) whose playwright.config.ts calls loadConfig() and passes the
 // result to workers through a standard option fixture.
 import { expect, test } from '@playwright/test';
-import { execFile } from 'node:child_process';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
+import { runNestedPlaywright, type NestedRunResult } from '../helpers/nested-playwright.js';
 
-const require = createRequire(import.meta.url);
-const playwrightCli = require.resolve('@playwright/test/cli');
 const projectDir = join(import.meta.dirname, '..', 'fixtures', 'pw-project');
 
-interface RunResult {
-  code: number;
-  output: string;
-}
-
-function runNested(env: Record<string, string>, outputDir: string): Promise<RunResult> {
-  // Start from a clean environment: the outer runner's worker variables and loader hooks
-  // must not leak into the nested run.
-  const clean = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !/^(TEST_|PW_|PLAYWRIGHT_|NODE_OPTIONS$|QA_CORTEX_)/.test(key)),
-  );
-  return new Promise((resolve) => {
-    execFile(
-      process.execPath,
-      [playwrightCli, 'test', '-c', join(projectDir, 'playwright.config.ts')],
-      { cwd: projectDir, env: { ...clean, ...env, QAC_NESTED_OUTPUT: outputDir }, timeout: 60_000 },
-      (error, stdout, stderr) => resolve({ code: error ? Number(error.code ?? 1) : 0, output: `${stdout}\n${stderr}` }),
-    );
-  });
+function runNested(env: Record<string, string>, outputDir: string): Promise<NestedRunResult> {
+  return runNestedPlaywright(projectDir, env, outputDir);
 }
 
 test.describe('Playwright configuration compatibility', () => {

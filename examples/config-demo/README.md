@@ -11,7 +11,7 @@ No configuration logic is copied here.
 |---|---|
 | `qa.config.ts` | `defineQaConfig()`: a schema extension (`site`) and two profiles, `local` and `staging` |
 | `playwright.config.ts` | `loadConfig()` at the top of Playwright's own config; `baseURL` mapped into `use` |
-| `tests/fixtures.ts` | the loaded config handed to tests through a plain Playwright option fixture |
+| `tests/fixtures.ts` | `configFixtures()` added to the project's own `test.extend()`: a `qaConfig` fixture, loaded once per worker |
 | `tests/site.spec.ts` | one browser test whose target and expectations come from the selected profile |
 | `scripts/with-profile.mjs` | runs `playwright test` with `QA_CORTEX_PROFILE` set (works in any shell) |
 | `scripts/invalid-config.mjs` | loads a deliberately broken config and prints the `ConfigError` |

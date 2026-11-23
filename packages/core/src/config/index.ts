@@ -21,5 +21,6 @@ export {
   type LoadedConfig,
 } from './load.js';
 export { ConfigError, type ConfigIssue } from './errors.js';
+export { configFixtures, type ConfigWorkerFixtures } from './fixtures.js';
 export { RESERVED_NAMESPACES, isReservedNamespace, type ReservedNamespace } from './reserved.js';
 export type { DeepPartial, DeepReadonly } from './types.js';
