@@ -117,7 +117,7 @@ The merge is our own code, about 60 lines, with no dependency. It records which 
 - **Ancestor provenance.** It's approximate. A default-filled leaf under an object a layer set (for example `timeouts.navigation` when only `timeouts.action` was set) is reported as coming from that layer. Acceptable for error messages.
 
 ## Addendum: production implementation and API review (2026-11-23)
-This section records Step 4B (implementation in `packages/core/src/config/`, commit `6801925`) and the Step 4C API review. The merge rules, provenance, validation, error format and freeze rules above are unchanged.
+This section records Step 4B (implementation in `packages/core/src/config/`, commit `0a4b3f3`) and the Step 4C API review. The merge rules, provenance, validation, error format and freeze rules above are unchanged.
 
 ### Final public API (`@qa-cortex/core/config`)
 ```ts
