@@ -14,6 +14,8 @@ packages/
     test/               package tests, run against the built output
       types/            compile-only type tests (checked by `npm run typecheck`)
       fixtures/         nested Playwright project used by the integration test
+examples/
+  config-demo/          runnable demo of @qa-cortex/core/config (see its README)
 docs/adr/               architecture decision records (start here)
 spikes/                 M0 technical spikes (S0–S4), kept as history; not built or linted
 tsconfig.base.json      shared compiler settings
@@ -34,10 +36,14 @@ Run from the repository root:
 |---|---|
 | `npm install` | Installs all workspace dependencies. |
 | `npm run build` | Compiles every package with `tsc -b` (JS, `.d.ts`, declaration maps). |
-| `npm run typecheck` | Builds, then type-checks the tests against the built packages. |
-| `npm run lint` | Runs ESLint with type-aware rules. |
+| `npm run typecheck` | Builds, then type-checks the tests, root tool configs and the examples against the built packages. |
+| `npm run lint` | Runs ESLint with type-aware rules (packages and examples). |
 | `npm test` | Builds, then runs the package tests with Playwright Test. |
 | `npm run clean` | Removes build output. |
+
+`npm test` runs only `packages/*/test`. The browser tests in `examples/` visit public
+websites, so they are **not** part of the mandatory suite; run them from each example's
+folder (see `examples/config-demo/README.md`).
 
 ## Configuration (`@qa-cortex/core/config`)
 
