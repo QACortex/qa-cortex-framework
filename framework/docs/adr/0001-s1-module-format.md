@@ -1,6 +1,6 @@
 # ADR 0001 — S1 module format: ship ESM-only
 
-- Status: accepted (spike S1, 2026-11-23). Amended by the three dated addenda at the end (Step 3 review, Step 3B validation, Step 7B CI results). The Node 22/24 runtime checks passed in CI; one detail (the Node 22.12.0 warning) is still to be read from the run's job summaries.
+- Status: accepted (spike S1, 2026-11-23). Amended by the three dated addenda at the end (Step 3 review, Step 3B validation, Step 7B CI results). The Node 22/24 runtime checks passed in CI. Node 22.12.0 prints the `require(esm)` ExperimentalWarning, and the probes still pass. CI pins Linux to Ubuntu 24.04 (see "Operating system limitation").
 - Spike code: `spikes/s1-module-format/` (throwaway)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2 (+ 6.0.3 API), `@playwright/test` 1.65.1 and 1.60.0, attw 0.18.5, publint 0.3.25
 
@@ -203,21 +203,45 @@ installed into isolated consumer projects outside the repository, with no worksp
 ### Result
 The run passed: the package job and all 12 consumer jobs (24 consumer runs) were green.
 
+### Node 22.12.0 prints the `require(esm)` warning
+The `probe.cjs` rows of the Node 22.12.0 jobs show that Node 22.12.0 **emits the one-time
+`require(esm)` ExperimentalWarning** when a CommonJS consumer `require()`s the package. This was
+expected from the Node docs, which say the warning was removed in 22.13.0.
+
+The compatibility probes **still pass** on 22.12.0. The warning is cosmetic: it does not change
+behaviour, and the probes record it without treating it as a failure.
+
+- **Decision:** the minimum stays `>=22.12`.
+- QA Cortex does not suppress the warning. Users who want to avoid it can run Node ≥22.13.
+
+### Operating system limitation (Step 8 PR run)
+- **What failed:** on the Step 8 pull request, the three `ubuntu-latest` × Playwright **1.60.0**
+  consumer jobs (Node 22.12.0, 24 and 26) failed. The other 9 consumer jobs, the package job and
+  CI passed.
+- **Cause:** GitHub's `ubuntu-latest` label moved to **Ubuntu 26.04**. Playwright 1.60.0 has no
+  `chromium-headless-shell` build for `ubuntu26.04-x64`, so the browser install fails before any
+  test runs. This is not a QA Cortex failure. Playwright 1.65.1 supports Ubuntu 26.04.
+- **Fix:** the Compatibility workflow pins the Linux consumer runner to **`ubuntu-24.04`** and
+  keeps every Node × Playwright combination.
+- **What this means for users:**
+  - Playwright 1.60.0 (our peer floor) is verified on Ubuntu 24.04 and Windows.
+  - Projects on Ubuntu 26.04 need a Playwright version that supports it.
+  - The peer floor is unchanged.
+- **Revisit:** if GitHub retires `ubuntu-24.04` runners, or if the peer floor is raised.
+
 ### Updates to the open items and required tests above
 - **Node floor `>=22.12`: verified.** `require()` of ESM works on Node 22.12.0, 24 and 26, in
   CommonJS and ESM consumers. This closes the "Node floor not verified locally" item and the
   "Node.js 22 and 24 runtime compatibility" pending item.
-- **Platforms:** Linux and Windows verified (required test 4). **macOS is still untested.**
+- **Platforms:** Linux (Ubuntu 24.04) and Windows verified (required test 4). **macOS is still
+  untested.**
 - **Playwright types:** the real package type-checks against Playwright 1.60.0 and 1.65.1
   (required test 2), which the stub-only results above could not show.
 - **Publish checks** on the real tarball pass (required test 5).
 - **Required test 1** (CJS and ESM smoke tests on Node 22.12.0, 24 and 26) passes.
 
 ### Still open
-- **Node 22.12.0 warning.** Whether 22.12.0 printed the one-time `require(esm)`
-  ExperimentalWarning was not recorded here. Each consumer job's summary has a `probe.cjs` row
-  ending in `warnings: …`; read it from the Node 22.12.0 jobs. It only decides whether the
-  minimum moves to `>=22.13`; the run already shows 22.12.0 works.
+- **Ubuntu 26.04 with Playwright 1.60.0** is unsupported upstream, and CI does not cover it.
 - **TypeScript 5.8 / 5.9 consumers** (required test 3) are not in the CI matrix; the evidence is
   still the local Step 3B run on the stub.
 - **Node "latest 22.x"** is not a separate matrix entry; only 22.12.0 is.

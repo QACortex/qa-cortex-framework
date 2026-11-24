@@ -82,7 +82,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Linux is pinned to ubuntu-24.04: ubuntu-latest moved to Ubuntu 26.04, where Playwright
+        # 1.60.0 has no chromium-headless-shell build. See ADR 0001 (Step 7B addendum).
+        os: [ubuntu-24.04, windows-latest]
         node: ['22.12.0', '24', '26']
         playwright: ['1.60.0', '1.65.1']
     defaults:
