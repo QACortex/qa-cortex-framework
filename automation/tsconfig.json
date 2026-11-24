@@ -9,7 +9,9 @@
     "skipLibCheck": false,
     "noEmit": true,
     "allowJs": true,
-    "checkJs": true
+    "checkJs": true,
+    "resolveJsonModule": true
   },
-  "include": ["playwright.config.ts", "qa.config.ts", "tests", "scripts"]
+  // reference/ (local reference scripts) is deliberately not included.
+  "include": ["playwright.config.ts", "qa.config.ts", "qa.secrets.ts", "tests", "pages", "components", "data", "scripts"]
 }

@@ -1,0 +1,8 @@
+{
+  "validAccountNumber": "12345678",
+  "messages": {
+    "required": "Account number is required.",
+    "verified": "Account number verified successfully."
+  },
+  "transactionPattern": "^Transaction TXN\\d+ completed successfully\\.$"
+}

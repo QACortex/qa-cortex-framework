@@ -1,0 +1,8 @@
+{
+  "scenarios": [
+    { "category": "Elements", "menu": "Text Box", "path": "#/elements/text-box", "heading": "Text Box" },
+    { "category": "Elements", "menu": "Check Box", "path": "#/elements/check-box", "heading": "Check Box" },
+    { "category": "Elements", "menu": "Dropdown (HTML Select)", "path": "#/elements/dropdown-html-select", "heading": "Dropdown (HTML Select)" },
+    { "category": "Elements", "menu": "Text Validation", "path": "#/elements/text-validation", "heading": "Text Validation" }
+  ]
+}
