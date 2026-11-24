@@ -6,7 +6,9 @@
 #              no workspace links) on every OS x Node x Playwright combination, as CommonJS
 #              and as ESM: require/import probes, a consumer type-check against that
 #              Playwright version, config and logger fixture tests and a Chromium smoke test
-#              against a local server (no external websites). See compat/run-consumer.mjs.
+#              against a local server (no external websites). See framework/compat/run-consumer.mjs.
+#
+# Every `run:` step works inside the framework npm project (framework/).
 #
 # Alternative Playwright versions are installed only inside the temporary consumer projects:
 # the repository lockfile is never changed. Nothing is published or deployed.
@@ -31,6 +33,9 @@ jobs:
     name: Package checks (publint, attw) and tarball
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: framework
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,6 +47,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: framework/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -76,16 +82,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # Linux is pinned to ubuntu-24.04: ubuntu-latest moved to Ubuntu 26.04, where Playwright
+        # 1.60.0 has no chromium-headless-shell build. See ADR 0001 (Step 7B addendum).
+        os: [ubuntu-24.04, windows-latest]
         node: ['22.12.0', '24', '26']
         playwright: ['1.60.0', '1.65.1']
+    defaults:
+      run:
+        working-directory: framework
     steps:
       # Only the consumer template and its driver: the tests cannot import workspace source.
-      - name: Check out compat/ only
+      - name: Check out framework/compat/ only
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          sparse-checkout: compat
+          sparse-checkout: framework/compat
           sparse-checkout-cone-mode: false
 
       - name: Set up Node.js ${{ matrix.node }}

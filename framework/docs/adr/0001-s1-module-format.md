@@ -1,6 +1,6 @@
 # ADR 0001 — S1 module format: ship ESM-only
 
-- Status: accepted (spike S1, 2026-11-23). Amended by the two dated addenda at the end (Step 3 review, Step 3B validation); finalised 2026-11-23. Only Node 22/24 runtime checks remain, pending CI.
+- Status: accepted (spike S1, 2026-11-23). Amended by the three dated addenda at the end (Step 3 review, Step 3B validation, Step 7B CI results). The Node 22/24 runtime checks passed in CI. Node 22.12.0 prints the `require(esm)` ExperimentalWarning, and the probes still pass. CI pins Linux to Ubuntu 24.04 (see "Operating system limitation").
 - Spike code: `spikes/s1-module-format/` (throwaway)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2 (+ 6.0.3 API), `@playwright/test` 1.65.1 and 1.60.0, attw 0.18.5, publint 0.3.25
 
@@ -181,3 +181,71 @@ These results show the package *format* works. They don't prove that the real `@
 
 ### Tooling note
 A globally installed TypeScript can be picked up by `npx tsc` in a folder without a local install; it happened once during these runs. Project scripts must call the workspace's local `tsc`.
+
+## Addendum: CI compatibility results (Step 7B, recorded 2026-11-24)
+This section records the first run of the Compatibility workflow (`.github/workflows/compatibility.yml`,
+added in commit `df7fe29`). **No change to the decision or to the package manifest.**
+
+**Scope.** Unlike the earlier addenda, these results are for the **real `@qa-cortex/core`**
+(config and logger modules, `0.0.0`), not the S1 stub. The tarball was packed once in CI and
+installed into isolated consumer projects outside the repository, with no workspace links.
+
+### What ran
+- **Package job** (Ubuntu, Node 22): `pack:check`, `publint --strict` and
+  `attw --pack --profile esm-only` on the packed tarball.
+- **Consumer matrix**, 12 jobs: `ubuntu-latest` and `windows-latest` × Node `22.12.0`, `24` and
+  `26` × Playwright `1.60.0` and `1.65.1`. Each job ran a CommonJS and an ESM consumer:
+  - `probe.cjs` (`require()`) and `probe.mjs` (`import`) of every subpath
+  - a consumer type-check against that Playwright version
+  - the config and logger fixture tests
+  - a Chromium smoke test against a local server (no external websites)
+
+### Result
+The run passed: the package job and all 12 consumer jobs (24 consumer runs) were green.
+
+### Node 22.12.0 prints the `require(esm)` warning
+The `probe.cjs` rows of the Node 22.12.0 jobs show that Node 22.12.0 **emits the one-time
+`require(esm)` ExperimentalWarning** when a CommonJS consumer `require()`s the package. This was
+expected from the Node docs, which say the warning was removed in 22.13.0.
+
+The compatibility probes **still pass** on 22.12.0. The warning is cosmetic: it does not change
+behaviour, and the probes record it without treating it as a failure.
+
+- **Decision:** the minimum stays `>=22.12`.
+- QA Cortex does not suppress the warning. Users who want to avoid it can run Node ≥22.13.
+
+### Operating system limitation (Step 8 PR run)
+- **What failed:** on the Step 8 pull request, the three `ubuntu-latest` × Playwright **1.60.0**
+  consumer jobs (Node 22.12.0, 24 and 26) failed. The other 9 consumer jobs, the package job and
+  CI passed.
+- **Cause:** GitHub's `ubuntu-latest` label moved to **Ubuntu 26.04**. Playwright 1.60.0 has no
+  `chromium-headless-shell` build for `ubuntu26.04-x64`, so the browser install fails before any
+  test runs. This is not a QA Cortex failure. Playwright 1.65.1 supports Ubuntu 26.04.
+- **Fix:** the Compatibility workflow pins the Linux consumer runner to **`ubuntu-24.04`** and
+  keeps every Node × Playwright combination.
+- **What this means for users:**
+  - Playwright 1.60.0 (our peer floor) is verified on Ubuntu 24.04 and Windows.
+  - Projects on Ubuntu 26.04 need a Playwright version that supports it.
+  - The peer floor is unchanged.
+- **Revisit:** if GitHub retires `ubuntu-24.04` runners, or if the peer floor is raised.
+
+### Updates to the open items and required tests above
+- **Node floor `>=22.12`: verified.** `require()` of ESM works on Node 22.12.0, 24 and 26, in
+  CommonJS and ESM consumers. This closes the "Node floor not verified locally" item and the
+  "Node.js 22 and 24 runtime compatibility" pending item.
+- **Platforms:** Linux (Ubuntu 24.04) and Windows verified (required test 4). **macOS is still
+  untested.**
+- **Playwright types:** the real package type-checks against Playwright 1.60.0 and 1.65.1
+  (required test 2), which the stub-only results above could not show.
+- **Publish checks** on the real tarball pass (required test 5).
+- **Required test 1** (CJS and ESM smoke tests on Node 22.12.0, 24 and 26) passes.
+
+### Still open
+- **Ubuntu 26.04 with Playwright 1.60.0** is unsupported upstream, and CI does not cover it.
+- **TypeScript 5.8 / 5.9 consumers** (required test 3) are not in the CI matrix; the evidence is
+  still the local Step 3B run on the stub.
+- **Node "latest 22.x"** is not a separate matrix entry; only 22.12.0 is.
+- **Playwright 1.61–1.64** remain untested (inside the peer range, assumed to work).
+- **npm scope:** the `qa-cortex` npm org still has to be created before publishing.
+- Paths in this ADR that predate Step 8 (`examples/`, `spikes/`, `compat/`) are relative to
+  the old repository root; the framework now lives under `framework/`.

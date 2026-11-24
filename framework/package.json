@@ -1,20 +1,19 @@
 {
-  "name": "qa-cortex",
+  "name": "qa-cortex-framework",
   "version": "0.0.0",
   "private": true,
-  "description": "QA Cortex: a thin, composition-first extension layer over Playwright.",
+  "description": "QA Cortex framework development: the @qa-cortex/* packages, their tests and package checks.",
   "license": "MIT",
   "type": "module",
   "workspaces": [
-    "packages/*",
-    "examples/*"
+    "packages/*"
   ],
   "engines": {
     "node": ">=22.12"
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p packages/core/test && tsc -p tsconfig.tools.json && tsc -p examples/config-demo && tsc -p compat/consumer",
+    "typecheck": "tsc -b && tsc -p packages/core/test && tsc -p tsconfig.tools.json && tsc -p compat/consumer",
     "lint": "eslint .",
     "test": "tsc -b && playwright test",
     "clean": "tsc -b --clean",

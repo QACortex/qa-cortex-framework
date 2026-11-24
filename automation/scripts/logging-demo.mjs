@@ -1,5 +1,5 @@
 // Runs the logging demo with a fresh SYNTHETIC secret (not a real credential).
-//   node scripts/logging-demo.mjs success   -> tests/logging.spec.ts, expected exit code 0
+//   node scripts/logging-demo.mjs success   -> tests/ui/logging.spec.ts, expected exit code 0
 //   node scripts/logging-demo.mjs failure   -> tests/failure/ only,  expected exit code 1
 // The secret's value is never printed. It is `demo-synthetic-` plus 12 hex digits, so you can
 // search the terminal and HTML report for /demo-synthetic-[0-9a-f]{12}/: you should find no
@@ -20,7 +20,7 @@ const secret = `demo-synthetic-${randomBytes(6).toString('hex')}`;
 const env = { ...process.env, QA_CORTEX_PROFILE: 'local', QAC_DEMO_SECRET: secret };
 const args = ['test'];
 if (mode === 'success') {
-  args.push('tests/logging.spec.ts');
+  args.push('tests/ui/logging.spec.ts');
   delete env.QAC_DEMO_FAILURE;
 } else {
   env.QAC_DEMO_FAILURE = '1';

@@ -25,9 +25,19 @@ Not a framework with its own runtime.
 - Config schema reserves namespaced sections (api, ai)
 - Core never imports API or AI code (separate packages later)
 
-## Commands
+## Repository layout
+- One GitHub repository, two independent npm projects (own package.json and lockfile each):
+  - `framework/`: framework development and npm packaging (`packages/*` workspaces,
+    tests, compat checks, ADRs in `framework/docs/adr/`, spikes).
+  - `automation/`: ready-to-use automation project that consumes the packed
+    `@qa-cortex/core` tarball until the package is published.
+- The repository root holds only repo-level files (`.github/`, LICENSE, README, git config).
+- New framework packages go in `framework/packages/` (e.g. api, ai later).
+
+## Commands (run inside `framework/`)
+- Install: npm ci
 - Build: npm run build
-- Test: npx playwright test
+- Test: npm test
 - Lint: npm run lint
 
 ## Working agreement
