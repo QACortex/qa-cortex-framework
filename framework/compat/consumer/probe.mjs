@@ -5,6 +5,7 @@ import * as config from '@qa-cortex/core/config';
 import * as logger from '@qa-cortex/core/logger';
 import * as secrets from '@qa-cortex/core/secrets';
 import * as guard from '@qa-cortex/core/guard';
+import * as presets from '@qa-cortex/core/presets';
 
 /** @type {string[]} */
 const warnings = [];
@@ -15,6 +16,7 @@ assert.equal(typeof config.configFixtures, 'function');
 assert.equal(typeof logger.loggerFixtures, 'function');
 assert.equal(typeof secrets.secretsFixtures, 'function');
 assert.equal(typeof guard.productionGuardFixtures, 'function');
+assert.equal(typeof presets.qaPreset, 'function');
 assert.match(import.meta.resolve('@qa-cortex/core/logger'), /node_modules\/@qa-cortex\/core\/dist\/logger\/index\.js$/);
 // The package root is not exported. A variable keeps the type checker from rejecting the
 // literal at compile time, so the runtime refusal is what gets checked.

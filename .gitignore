@@ -8,6 +8,10 @@ dist/
 test-results/
 playwright-report/
 blob-report/
+# Report files written by the QA Cortex presets (JUnit, JSON; ADR 0009) and Allure results
+reports/
+allure-results/
+allure-report/
 
 # Secrets: session files (storageState, tokens; see ADR 0004) and environment files
 .auth/

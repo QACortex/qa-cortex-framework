@@ -13,6 +13,7 @@ packages/
     src/logger/         @qa-cortex/core/logger (structured, redacting logging; see ADR 0007)
     src/secrets/        @qa-cortex/core/secrets (typed secrets per profile; see ADR 0008)
     src/guard/          @qa-cortex/core/guard (Production guard; see ADR 0003, ADR 0008)
+    src/presets/        @qa-cortex/core/presets (reporter and artifact presets; see ADR 0009)
     test/               package tests, run against the built output
       types/            compile-only type tests (checked by `npm run typecheck`)
       fixtures/         nested Playwright projects run by the integration tests
