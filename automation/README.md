@@ -41,6 +41,8 @@ tests/
 scripts/                  demo runners and the framework packing helper
 vendor/                   packed @qa-cortex/core tarball (not committed; see vendor/README.md)
 reference/                optional local reference scripts: gitignored, never linted, type-checked or run
+playwright-report/, reports/, allure-results/, allure-report/, test-results/   generated reports (gitignored; see Reports)
+../.github/workflows/automation.yml   manual GitHub Actions run of these tests (see GitHub Actions)
 ```
 
 Future test types get their own folders next to `tests/ui/` (for example `tests/api/`).
@@ -81,6 +83,9 @@ paths relative to `baseURL`, so tests never change between environments. `produc
 guard applies to it.
 
 ## Setup (once, inside `automation/`)
+
+**Prerequisites:** Node.js **22.18 or later** (`package.json` `engines`; the Allure 3 report
+generator needs it, while `@qa-cortex/core` itself supports 22.12+) and npm. No Java is needed.
 
 `@qa-cortex/core` is not published yet, so this project installs it from a packed tarball at
 `vendor/qa-cortex-core.tgz`.
@@ -253,6 +258,97 @@ The sample tests are parallel-safe: every test gets its own browser context and 
 page itself, and keeps no state between tests. Keep new tests that way. A test that retries and
 then passes is reported as **flaky**, not as passed.
 
+## Reports
+
+Every run writes these (all gitignored). Which ones depends on the reporter preset (see
+[Reporter and artifact presets](#reporter-and-artifact-presets-qa-cortexcorepresets)):
+
+| Report | Where | Presets | Open it |
+|---|---|---|---|
+| Terminal | console: `list` locally, `dot` in CI (`github` annotations on GitHub Actions) | all | — |
+| Playwright HTML report | `playwright-report/index.html`, with screenshots, videos, traces and the `qa-cortex-log.jsonl` log of each test | local, ci | `npm run report` |
+| JUnit XML | `reports/junit.xml`, for CI systems and test management tools | ci, production | any JUnit viewer |
+| Allure results | `allure-results/` (raw; cleared at the start of every run) | local, ci | — |
+| Allure report | `allure-report/`, generated from the results | local, ci | `npm run allure:generate`, then `npm run allure:open` |
+| Raw diagnostics | `test-results/<test>/`: trace.zip, video.webm, screenshots, error-context.md | local, ci (on failure) | `npx playwright show-trace <trace.zip>` |
+
+Allure report in two commands:
+
+```powershell
+npm run test:smoke             # any run writes allure-results/
+npm run allure:generate        # writes allure-report/ (replaces the previous one)
+npm run allure:open            # serves it on http://127.0.0.1:<port> and opens the browser
+```
+
+The report generator is the `allure` package (Allure 3, a dev dependency): it needs **no Java**,
+but needs Node.js 22.18 or later. `allure:open` serves on 127.0.0.1 only; stop it with Ctrl+C.
+
+A failed test shows, in both the HTML and the Allure report: the error, the screenshot, the
+trace and (locally) the video, and the QA Cortex log `qa-cortex-log.jsonl`, whose secrets are
+written as `[REDACTED]`. **Reports are not redacted as a whole:** Playwright's own steps,
+traces and screenshots show what a test typed and saw, so never type a real secret into a page
+in a test whose report you share (see [What redaction does not cover](#what-redaction-does-not-cover)).
+The CI preset records no video; to change that, pass `{ artifacts: { video: 'retain-on-failure' } }`
+to `qaPreset()` in `playwright.config.ts`.
+
+## GitHub Actions
+
+`.github/workflows/automation.yml` runs these tests on GitHub. It is **manual only**: the sample
+tests visit a public website, so they never run on pull requests and never block the
+framework's own checks (`ci.yml`, `compatibility.yml`).
+
+**One-time setup** (repository **Settings → Secrets and variables → Actions → New repository
+secret**):
+
+| Secret | Required | Used by |
+|---|---|---|
+| `QA_DEMO_TOKEN` | **yes** (every profile) | the logging demo; any synthetic value of 4+ characters works |
+| `QA_STAGING_API_TOKEN` | no | the `staging` profile (`qa.secrets.ts`) |
+| `QA_PRODUCTION_API_TOKEN` | no | the `production` profile |
+| `QA_BASIC_AUTH_PASSWORD` | no | any profile |
+
+These are the variables `qa.secrets.ts` reads; add a secret here, and a line under the
+`Run tests` step's `env:` in the workflow, when you add one there. Secrets are given to the
+test step only (not to install steps). GitHub masks their values in the log, and QA Cortex
+redacts them in its own log output. No `.env` file is used or uploaded in CI.
+
+**Run it:** **Actions → Automation tests → Run workflow**, then choose:
+
+| Input | Choices | Becomes |
+|---|---|---|
+| Browser | chromium (default), firefox, webkit, all | `--project=<browser>` (none for all) |
+| Environment profile | local (default), staging, production | `QA_CORTEX_PROFILE` |
+| Tests | smoke (default), regression, all | `--grep @smoke` / `--grep @regression` (none for all) |
+
+The run uses the CI settings from `playwright.config.ts` (`CI` is set on GitHub): 2 workers,
+2 retries, the `ci` preset, or `production` with its guard for the production profile.
+
+Steps: build `@qa-cortex/core` from `framework/` and install the tarball, install the chosen
+browsers, type-check, lint, run the tests, generate the Allure report, upload the reports.
+**A failing test fails the run**, and the reports are uploaded anyway.
+
+**Download reports:** open the run, scroll to **Artifacts** (kept **14 days**):
+
+| Artifact | Contents |
+|---|---|
+| `playwright-report-<tests>-<browser>-<profile>` | the HTML report with screenshots, traces and logs; unzip, then `npx playwright show-report <folder>` |
+| `junit-…` | `junit.xml` |
+| `allure-results-…` | raw Allure results (to merge or regenerate) |
+| `allure-report-…` | the generated Allure report; unzip, then `npx allure open <folder>` |
+| `test-results-…-production` | production profile, failed runs only: error context (artifacts are off in production) |
+
+**Troubleshooting a failed run:**
+
+| Symptom | Cause and fix |
+|---|---|
+| `SecretsError: … QA_DEMO_TOKEN` | the repository secret is missing; add it (see above) |
+| `ConfigError` | the profile or `qa.config.ts` is invalid; the message names the field and the layer |
+| `ProductionGuardError` | a production run would record traces, videos or screenshots; keep the production preset's settings |
+| Tests fail on one browser only | open that browser's HTML report and trace; compare with a local `npm run test:<browser>` |
+| Many tests time out | the lab (or your application) may be down or slow; check it in a browser before changing timeouts |
+| Passed after a retry (**flaky**) | listed as flaky in both reports; fix the test, do not raise retries |
+| Install step fails | `npm ci` in `framework/` needs `framework/package-lock.json` to match its `package.json` |
+
 ## Run the demonstrations
 
 From `automation/`.
@@ -415,6 +511,15 @@ Redaction applies only to what `qaLog` writes. Playwright's own artifacts are no
 - action parameters
 - assertion and failure messages
 
+The same applies to **every report that stores them**: the Playwright HTML report, the Allure
+results and report (`allure-results/`, `allure-report/`), the JUnit file (failure messages), and
+the GitHub Actions artifacts made from them. Allure copies Playwright's steps, screenshots,
+videos, traces and attachments into its own files. Only the `qa-cortex-log.jsonl` attachment is
+redacted. Treat reports and CI artifacts as sensitive when tests handle real credentials or
+data, and keep them private. GitHub masks secrets in the workflow **log** only, not inside
+uploaded artifacts. In production profiles, the production preset turns traces, videos,
+screenshots, the HTML report and Allure off.
+
 That's why the failing test keeps the secret out of its assertion, and why secrets come from
 the environment instead of literals in source: traces and the HTML report embed source code.
 A `Secret` object prints as `[REDACTED]`, but once you call `reveal()` the value is an ordinary
@@ -429,8 +534,8 @@ preset. The first line of every run shows which one: `[qa-cortex] … preset=loc
 
 | Preset | Chosen when | Artifacts | Reporters and files |
 |---|---|---|---|
-| `local` | default | trace, video and screenshot of failed tests | list; HTML report in `playwright-report/` (`npm run report`) |
-| `ci` | `CI` is set | trace and screenshot of failed tests; no video | dot (github on GitHub Actions); HTML report; `reports/junit.xml` |
+| `local` | default | trace, video and screenshot of failed tests | list; HTML report in `playwright-report/` (`npm run report`); Allure results (added by this project) |
+| `ci` | `CI` is set | trace and screenshot of failed tests; no video | dot (github on GitHub Actions); HTML report; `reports/junit.xml`; Allure results (added by this project) |
 | `production` | the profile is `production` (always) | none | list; `reports/junit.xml` |
 
 `QA_CORTEX_PRESET=local|ci|production` chooses a preset by hand, except that a production
@@ -469,25 +574,14 @@ qaPreset('ci', { reporters: { replace: [['line'], ['junit', { outputFile: 'repor
 Command-line flags (`--reporter`, `--trace`) still override the config, as in any Playwright
 project; in production the guard still checks them.
 
-### Allure (not installed here)
+### Allure in this project
 
-Allure is a third-party reporter: install it in your test project, not in QA Cortex. A working
-example follows in a later step; the configuration is:
-
-```powershell
-npm install --save-dev allure-playwright
-```
-
-```ts
-const preset = qaPreset(selectPreset({ production: qa.production }), {
-  reporters: { extra: [['allure-playwright', { resultsDir: 'allure-results' }]] },
-});
-```
-
-In the production preset every reporter other than the console, JUnit and JSON ones must be
-approved, because QA Cortex cannot know what it stores:
+Allure is added in `playwright.config.ts` through the preset's `reporters.extra`, so the preset's
+own reporters stay as they are. It is on in the `local` and `ci` presets and **off in
+`production`**, where every reporter other than the console, JUnit and JSON ones must be
+approved, because Allure keeps test steps and attachments:
 `extra: [{ reporter: ['allure-playwright', { resultsDir: 'allure-results' }], allowInProduction: true }]`.
-`allure-results/` and `allure-report/` are gitignored.
+See [Reports](#reports) for the commands.
 
 ### What presets do not guarantee
 

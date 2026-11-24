@@ -1,0 +1,166 @@
+# Automation starter project (automation/): runs its browser tests on demand.
+#
+# MANUAL ONLY (workflow_dispatch). The sample tests visit the public QA Cortex Test Automation
+# Lab, so they are never a pull-request check and never block framework changes; the framework's
+# own checks live in ci.yml and compatibility.yml and are unaffected by this file.
+#
+# What it does: builds @qa-cortex/core from framework/ and installs it into automation/ (as the
+# README's setup does), installs the selected browsers, type-checks and lints, then runs the
+# selected tests with Playwright's CI settings from playwright.config.ts (2 workers, 2 retries,
+# reporter preset "ci", or "production" for the production profile, guard included). Reports and
+# failure diagnostics are uploaded even when tests fail; a failing test fails the run.
+#
+# Secrets: read from repository secrets in the test step only (never in install steps), never
+# printed; see automation/README.md, "GitHub Actions". Nothing is published or deployed.
+
+name: Automation tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: Browser
+        type: choice
+        options: [chromium, firefox, webkit, all]
+        default: chromium
+      profile:
+        description: Environment profile (QA_CORTEX_PROFILE)
+        type: choice
+        options: [local, staging, production]
+        default: local
+      tests:
+        description: Tests to run
+        type: choice
+        options: [smoke, regression, all]
+        default: smoke
+
+# Least privilege: read the repository, nothing else.
+permissions:
+  contents: read
+
+concurrency:
+  group: automation-${{ github.ref }}-${{ inputs.profile }}-${{ inputs.browser }}-${{ inputs.tests }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: ${{ inputs.tests }} · ${{ inputs.browser }} · ${{ inputs.profile }}
+    # Pinned image (as in compatibility.yml): Playwright's browser builds support it.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: automation
+    env:
+      # Inputs reach scripts through the environment, never by text substitution in `run:`.
+      BROWSER: ${{ inputs.browser }}
+      TESTS: ${{ inputs.tests }}
+      QA_CORTEX_PROFILE: ${{ inputs.profile }}
+
+    steps:
+      # Actions are pinned to full commit SHAs (supply-chain safety); the comment is the release.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            framework/package-lock.json
+            automation/package-lock.json
+
+      - name: Install framework dependencies
+        working-directory: framework
+        run: npm ci
+
+      # Builds framework/ and writes vendor/qa-cortex-core.tgz, then installs that tarball. Naming
+      # it refreshes its checksum in the (runner's copy of the) lockfile; every other dependency
+      # comes from automation/package-lock.json.
+      - name: Build and install @qa-cortex/core
+        run: |
+          npm run framework:pack
+          npm install --no-audit --no-fund file:vendor/qa-cortex-core.tgz
+
+      - name: Install Playwright browsers
+        run: |
+          if [ "$BROWSER" = all ]; then set -- chromium firefox webkit; else set -- "$BROWSER"; fi
+          npx playwright install --with-deps "$@"
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      # Secrets are given to this step only. GitHub masks their values in the log; QA Cortex
+      # redacts them in qaLog output and never prints them in errors.
+      - name: Run tests
+        env:
+          QA_DEMO_TOKEN: ${{ secrets.QA_DEMO_TOKEN }}
+          QA_STAGING_API_TOKEN: ${{ secrets.QA_STAGING_API_TOKEN }}
+          QA_PRODUCTION_API_TOKEN: ${{ secrets.QA_PRODUCTION_API_TOKEN }}
+          QA_BASIC_AUTH_PASSWORD: ${{ secrets.QA_BASIC_AUTH_PASSWORD }}
+        run: |
+          set --
+          if [ "$BROWSER" != all ]; then set -- "$@" "--project=$BROWSER"; fi
+          if [ "$TESTS" != all ]; then set -- "$@" --grep "@$TESTS"; fi
+          echo "playwright test $*  (profile: $QA_CORTEX_PROFILE)"
+          npx playwright test "$@"
+
+      # Everything below runs even when tests failed, so the reports explain the failure.
+      - name: Generate Allure report
+        if: ${{ !cancelled() && hashFiles('automation/allure-results/*') != '' }}
+        run: npm run allure:generate
+
+      # One artifact per report; test-results/ is not uploaded separately because the HTML report
+      # already contains its screenshots, videos, traces and log attachments.
+      - name: Upload Playwright HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report-${{ inputs.tests }}-${{ inputs.browser }}-${{ inputs.profile }}
+          path: automation/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload JUnit results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: junit-${{ inputs.tests }}-${{ inputs.browser }}-${{ inputs.profile }}
+          path: automation/reports/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: allure-results-${{ inputs.tests }}-${{ inputs.browser }}-${{ inputs.profile }}
+          path: automation/allure-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload Allure report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: allure-report-${{ inputs.tests }}-${{ inputs.browser }}-${{ inputs.profile }}
+          path: automation/allure-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      # Production profile only: no HTML report there (the production preset), so keep the raw
+      # failure output (error context; screenshots, videos and traces are off in production).
+      - name: Upload test results (production profile, on failure)
+        if: ${{ failure() && inputs.profile == 'production' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results-${{ inputs.tests }}-${{ inputs.browser }}-production
+          path: automation/test-results/
+          retention-days: 14
+          if-no-files-found: ignore

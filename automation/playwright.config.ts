@@ -1,5 +1,5 @@
 // Playwright's own config stays in charge. QA Cortex only supplies validated values and checks.
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { loadConfig, type ConfigWorkerFixtures } from '@qa-cortex/core/config';
@@ -24,7 +24,36 @@ loadSecrets(secretsDef, { profile: qa.profile });
 // Reporter and artifact preset: "production" for a production profile, else "ci" when CI is
 // set, else "local"; QA_CORTEX_PRESET=local|ci|production chooses one by hand (never weaker
 // than production). Pass overrides as the second argument, e.g. { artifacts: { video: 'off' } }.
-const preset = qaPreset(selectPreset({ production: qa.production }));
+//
+// Allure is added to the preset's own reporters (HTML, JUnit and the console reporter stay) for
+// the local and ci presets: allure-playwright writes raw results to allure-results/, and
+// `npm run allure:generate` turns them into a report. Not in production: Allure keeps test
+// steps and attachments, and the production preset deliberately writes console and JUnit
+// output only (ADR 0009). To allow it there, approve it explicitly with allowInProduction.
+const presetName = selectPreset({ production: qa.production });
+const allureResults = join(import.meta.dirname, 'allure-results');
+// allure-playwright never clears its results folder, so every run would add to the last report.
+// Start each run fresh, as Playwright does with test-results/ (main process only, not workers).
+if (presetName !== 'production' && !process.env.TEST_WORKER_INDEX) rmSync(allureResults, { recursive: true, force: true });
+const preset = qaPreset(
+  presetName,
+  presetName === 'production'
+    ? {}
+    : {
+        reporters: {
+          extra: [
+            [
+              'allure-playwright',
+              {
+                resultsDir: allureResults,
+                // Shown on the report's Environment panel; configuration values only, never secrets.
+                environmentInfo: { profile: qa.profile, baseURL: qa.baseURL, preset: presetName, node: process.version },
+              },
+            ],
+          ],
+        },
+      },
+);
 
 // This file is evaluated in the main process and again in every worker; log once.
 if (!process.env.TEST_WORKER_INDEX) {
