@@ -1,0 +1,16 @@
+{
+  // A typical consumer (ADR 0001): nodenext, and our declarations checked (skipLibCheck off)
+  // against whichever Playwright version is installed.
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": false,
+    "noEmit": true,
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["*.ts", "tests", "probe.cjs", "probe.mjs", "server.mjs"]
+}

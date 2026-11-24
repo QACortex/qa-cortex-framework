@@ -1,0 +1,116 @@
+# Compatibility validation for the PUBLISHED SHAPE of @qa-cortex/core (ADR 0001).
+#
+#   package    builds and packs @qa-cortex/core once, runs the package-level checks once
+#              (pack:check, publint --strict, attw --profile esm-only) and uploads the tarball.
+#   consumers  installs that tarball into isolated consumer projects (outside the repository,
+#              no workspace links) on every OS x Node x Playwright combination, as CommonJS
+#              and as ESM: require/import probes, a consumer type-check against that
+#              Playwright version, config and logger fixture tests and a Chromium smoke test
+#              against a local server (no external websites). See compat/run-consumer.mjs.
+#
+# Alternative Playwright versions are installed only inside the temporary consumer projects:
+# the repository lockfile is never changed. Nothing is published or deployed.
+
+name: Compatibility
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege, as in ci.yml.
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Package checks (publint, attw) and tarball
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate package contents
+        run: npm run pack:check
+
+      - name: publint and Are the Types Wrong (attw)
+        run: npm run pack:lint
+
+      - name: Pack tarball
+        run: |
+          mkdir -p "$RUNNER_TEMP/pack"
+          npm pack --workspace @qa-cortex/core --pack-destination "$RUNNER_TEMP/pack"
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: qa-cortex-core-tarball
+          path: ${{ runner.temp }}/pack/*.tgz
+          retention-days: 3
+          if-no-files-found: error
+
+  consumers:
+    name: ${{ matrix.os }} · Node ${{ matrix.node }} · Playwright ${{ matrix.playwright }}
+    needs: package
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.12.0', '24', '26']
+        playwright: ['1.60.0', '1.65.1']
+    steps:
+      # Only the consumer template and its driver: the tests cannot import workspace source.
+      - name: Check out compat/ only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: compat
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Download tarball
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: qa-cortex-core-tarball
+          path: ${{ runner.temp }}/pack
+
+      - name: CommonJS consumer (also installs Chromium for this Playwright version)
+        run: node compat/run-consumer.mjs --tarball "${{ runner.temp }}/pack" --playwright "${{ matrix.playwright }}" --format cjs --install-browser --workdir "${{ runner.temp }}/consumers"
+
+      - name: ESM consumer
+        if: ${{ !cancelled() }}
+        run: node compat/run-consumer.mjs --tarball "${{ runner.temp }}/pack" --playwright "${{ matrix.playwright }}" --format esm --install-browser --workdir "${{ runner.temp }}/consumers"
+
+      - name: Upload consumer test results on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: consumer-results-${{ matrix.os }}-node${{ matrix.node }}-pw${{ matrix.playwright }}
+          path: ${{ runner.temp }}/consumers/*/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

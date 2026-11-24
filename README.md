@@ -41,10 +41,21 @@ Run from the repository root:
 | `npm run lint` | Runs ESLint with type-aware rules (packages and examples). |
 | `npm test` | Builds, then runs the package tests with Playwright Test. |
 | `npm run pack:check` | After a build: dry-run `npm pack` of `@qa-cortex/core`; fails if an `exports` target, `LICENSE` or `package.json` would be missing, or if build caches or tests would be published. Nothing is published. |
+| `npm run pack:lint` | After a build: `publint --strict` and Are the Types Wrong (`attw --profile esm-only`) on the packed package (ADR 0001). |
 | `npm run clean` | Removes build output. |
 
 CI (`.github/workflows/ci.yml`) runs `npm ci`, then `build`, `typecheck`, `lint`, `test` and
 `pack:check` on Ubuntu with Node.js 22, for pushes and pull requests to `main`.
+
+Compatibility (`.github/workflows/compatibility.yml`, on pull requests to `main` and on demand)
+packs `@qa-cortex/core` once, runs `pack:check` and `pack:lint` once, then installs the
+**tarball** into isolated CommonJS and ESM consumer projects on Ubuntu and Windows ×
+Node.js 22.12.0 / 24 / 26 × Playwright 1.60.0 / 1.65.1. To run one consumer locally after
+`npm run build` and `npm pack --workspace @qa-cortex/core --pack-destination <dir>`:
+
+```powershell
+node compat/run-consumer.mjs --tarball <dir> --playwright 1.65.1 --format cjs --install-browser
+```
 
 `npm test` runs only `packages/*/test`. The browser tests in `examples/` visit public
 websites, so they are **not** part of the mandatory suite; run them from each example's

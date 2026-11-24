@@ -14,16 +14,19 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p packages/core/test && tsc -p tsconfig.tools.json && tsc -p examples/config-demo",
+    "typecheck": "tsc -b && tsc -p packages/core/test && tsc -p tsconfig.tools.json && tsc -p examples/config-demo && tsc -p compat/consumer",
     "lint": "eslint .",
     "test": "tsc -b && playwright test",
     "clean": "tsc -b --clean",
-    "pack:check": "node scripts/check-package.mjs"
+    "pack:check": "node scripts/check-package.mjs",
+    "pack:lint": "publint packages/core --strict && attw --pack packages/core --profile esm-only"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.5",
     "@playwright/test": "1.65.1",
     "@types/node": "22.20.5",
     "eslint": "9.39.5",
+    "publint": "0.3.25",
     "typescript": "6.0.3",
     "typescript-eslint": "8.73.0"
   }

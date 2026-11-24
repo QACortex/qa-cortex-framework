@@ -11,5 +11,5 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["playwright.config.ts", "eslint.config.js", "scripts/*.mjs"]
+  "include": ["playwright.config.ts", "eslint.config.js", "scripts/*.mjs", "compat/*.mjs"]
 }
