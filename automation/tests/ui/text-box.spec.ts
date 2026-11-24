@@ -2,7 +2,7 @@
 import data from '../../data/text-box.json' with { type: 'json' };
 import { expect, test } from '../fixtures.js';
 
-test.describe('Text Box', () => {
+test.describe('Text Box', { tag: '@regression' }, () => {
   test.beforeEach(async ({ textBoxPage }) => {
     await textBoxPage.open();
     await expect(textBoxPage.formHeading).toBeVisible();

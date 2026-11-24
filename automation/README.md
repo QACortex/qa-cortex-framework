@@ -100,7 +100,7 @@ cd automation
 npm run framework:pack
 npm install file:vendor/qa-cortex-core.tgz
 Copy-Item .env.example .env
-npx playwright install chromium
+npx playwright install chromium firefox webkit
 ```
 
 Outside the repository, copy a `@qa-cortex/core` tarball to `vendor/qa-cortex-core.tgz`, then
@@ -110,7 +110,8 @@ run the last three commands.
 reports "up to date" and keeps the previously installed copy (same version, same `file:` spec),
 and `npm ci` fails because the lockfile records the old tarball's checksum. Naming the tarball
 re-extracts it and updates the checksum in `package-lock.json`; `package.json` does not change.
-Skip the browser install if Chromium for Playwright 1.65.1 is already installed.
+Skip the browser install if the browsers for Playwright 1.65.1 are already installed. Install
+only `chromium` if you run Chromium alone (the default of `npm test`).
 
 ### Secrets: `.env`
 
@@ -125,8 +126,7 @@ missing variable (never a value).
 
 | Command | What it does |
 |---|---|
-| `npm test` | Runs every browser test in `tests/ui/` (public websites; `tests/failure/` excluded). |
-| `npx playwright test tests/ui/text-box.spec.ts` | Runs one spec file; add `-g "Cardiff"` to run matching tests only. |
+| `npm test` | Runs every test in `tests/ui/` in Chromium (public websites; `tests/failure/` excluded). More in [Running tests](#running-tests). |
 | `npm run typecheck` | Type-checks configs, tests and scripts against the installed `@qa-cortex/core`. |
 | `npm run lint` | ESLint with type-aware rules. |
 
@@ -181,9 +181,77 @@ A new page in four steps:
    });
    ```
 
+Tag a test (or a whole `describe`) with Playwright's native tags: `test('…', { tag: '@smoke' }, …)`.
+Tags add up, so a `@regression` describe can hold a test that is also `@smoke`.
+
 Not added on purpose, because Playwright already provides them: wrappers around `click`/`fill`,
-custom waits, retry helpers and a base page class. Browsers, retries and parallel settings,
+custom waits, retry helpers, a custom tagging or parallel mechanism and a base page class.
 Allure and a CI workflow are planned for the next steps.
+
+## Running tests
+
+Everything here is Playwright's own command line; the npm scripts are shortcuts. Every run uses
+the selected environment profile (`QA_CORTEX_PROFILE`, default `local`), the project fixtures
+and the reporter preset.
+
+| Command | What it runs |
+|---|---|
+| `npm test` | every test, **Chromium**, headless |
+| `npm run test:chromium` / `test:firefox` / `test:webkit` | every test in one browser |
+| `npm run test:all` | every test in **Chromium, Firefox and WebKit** |
+| `npm run test:smoke` | tests tagged `@smoke` (quick health check), Chromium |
+| `npm run test:regression` | tests tagged `@regression` (full feature coverage), Chromium |
+| `npm run test:headed` | Chromium with a visible browser window |
+| `npm run test:ui` | Playwright UI mode: pick projects, tests and tags; watch, time-travel through steps |
+| `npm run test:debug` | Playwright Inspector: step through each action (use with one test, see below) |
+| `npm run report` | opens the last HTML report |
+
+Add Playwright options after `--` (npm passes them on):
+
+```powershell
+npm test -- tests/ui/text-box.spec.ts                 # one file
+npm test -- tests/ui/dropdown.spec.ts:14              # one test, by line
+npm test -- -g "Cardiff"                              # by test name (regular expression)
+npm run test:smoke -- --workers=4                     # more workers
+npm test -- --retries=1 --timeout=60000               # retries and per-test timeout
+npm run test:debug -- -g "transfer completes"         # debug one test
+npm run test:headed -- tests/ui/check-box.spec.ts     # watch one file run
+```
+
+Browsers and tags combine with plain Playwright commands (`--project` may be repeated):
+
+```powershell
+npx playwright test --project=firefox --grep @smoke
+npx playwright test --project=chromium --project=webkit --grep @regression
+npx playwright test --grep-invert @regression         # everything except @regression
+```
+
+Combine with an environment profile:
+
+```powershell
+$env:QA_CORTEX_PROFILE = "staging"; npm run test:smoke; Remove-Item Env:QA_CORTEX_PROFILE
+node scripts/with-profile.mjs staging --project=firefox --grep @smoke
+```
+
+```bash
+QA_CORTEX_PROFILE=staging npm run test:smoke
+```
+
+**Defaults** (`playwright.config.ts`; native Playwright options):
+
+| Setting | Local | CI (`CI` set) | Override |
+|---|---|---|---|
+| Browser | Chromium (`npm test`) | Chromium | `--project=firefox` (repeatable), or `npm run test:all` |
+| Headless | yes | yes | `--headed` |
+| Parallel | yes: `fullyParallel`, so tests in one file also run in parallel | yes | `--workers=1` runs one at a time |
+| Workers | Playwright's default: half the CPU cores | **2** (conservative for shared runners) | `--workers=4` or `--workers=50%` |
+| Retries | 0 | 2 | `--retries=N` |
+| Test timeout | 30 s (test, its hooks and fixtures) | 30 s | `--timeout=60000`; or `test.slow()` / `test.setTimeout()` in a test |
+| Assertion timeout | 5 s per web-first assertion | 5 s | no CLI flag: `expect(locator).toBeVisible({ timeout: 10_000 })`, or `expect.timeout` in the config |
+
+The sample tests are parallel-safe: every test gets its own browser context and page, opens its
+page itself, and keeps no state between tests. Keep new tests that way. A test that retries and
+then passes is reported as **flaky**, not as passed.
 
 ## Run the demonstrations
 

@@ -4,7 +4,7 @@ import { ScenarioMenu } from '../../components/scenario-menu.js';
 import data from '../../data/scenarios.json' with { type: 'json' };
 import { expect, test } from '../fixtures.js';
 
-test.describe('Lab navigation through the Scenarios menu', () => {
+test.describe('Lab navigation through the Scenarios menu', { tag: '@smoke' }, () => {
   for (const scenario of data.scenarios) {
     test(`opens "${scenario.menu}"`, async ({ page, qaConfig, qaLog }) => {
       const menu = new ScenarioMenu(page);

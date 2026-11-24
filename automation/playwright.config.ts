@@ -34,13 +34,28 @@ if (!process.env.TEST_WORKER_INDEX) {
 // The intentional-failure demo (tests/failure/) runs ONLY when QAC_DEMO_FAILURE is set,
 // via `npm run demo:logging-failure`. Every other run ignores that folder.
 const failureDemo = !!process.env.QAC_DEMO_FAILURE;
+const ci = !!process.env.CI;
+
+// Browser projects. `npm test` runs Chromium only (--project=chromium); `npm run test:all` runs
+// all three. Every project uses the same environment profile, fixtures and preset.
+const browsers = [
+  { name: 'chromium', device: devices['Desktop Chrome'] },
+  { name: 'firefox', device: devices['Desktop Firefox'] },
+  { name: 'webkit', device: devices['Desktop Safari'] },
+];
 
 const config = defineConfig<object, ConfigWorkerFixtures<typeof schema> & LoggerWorkerFixtures>({
   testDir: 'tests',
   // Native Playwright reporters chosen by the preset (local: list + HTML report; ci: dot or
   // github + HTML + JUnit in reports/; production: list + JUnit, no HTML report).
   reporter: preset.reporter,
-  forbidOnly: !!process.env.CI,
+  forbidOnly: ci,
+  // Execution defaults (native Playwright; every one can be overridden on the command line):
+  fullyParallel: true, // tests are independent (fresh page each), so even tests in one file run in parallel
+  workers: ci ? 2 : undefined, // CI: 2, conservative for shared runners; locally Playwright's default (half the CPU cores). --workers=N
+  retries: ci ? 2 : 0, // --retries=N
+  timeout: 30_000, // per test, including its fixtures and hooks. --timeout=N
+  expect: { timeout: 5_000 }, // per web-first assertion; no CLI flag: pass { timeout } to one assertion
   use: {
     ...preset.use, // trace, video and screenshot for the preset (production: all off)
     baseURL: qa.baseURL, // QA Cortex value mapped explicitly into Playwright's own option
@@ -54,13 +69,11 @@ const config = defineConfig<object, ConfigWorkerFixtures<typeof schema> & Logger
           use: { ...devices['Desktop Chrome'], qaLogAttach: 'on-failure' }, // attach only failed tests' logs
         },
       ]
-    : [
-        {
-          name: 'chromium',
-          testIgnore: '**/failure/**',
-          use: { ...devices['Desktop Chrome'], qaLogAttach: 'always' }, // attach every test's log
-        },
-      ],
+    : browsers.map(({ name, device }) => ({
+        name,
+        testIgnore: '**/failure/**',
+        use: { ...device, qaLogAttach: 'always' as const }, // attach every test's log
+      })),
 });
 
 // Production guard, static part: throws if a production run would record traces, videos or
