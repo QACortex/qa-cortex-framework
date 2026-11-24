@@ -6,7 +6,7 @@ test('opens the home page of the selected environment', async ({ page, qaConfig:
   // './' resolves against baseURL, which comes from the selected QA Cortex profile.
   await page.goto('./');
 
-  // Prefix match: single-page apps may add a route after load (TodoMVC adds `#/`).
+  // Prefix match: single-page apps may add a route after load (the lab adds `#/`).
   await expect(page).toHaveURL(new RegExp(`^${escapeRegExp(qa.baseURL)}`));
   await expect(page).toHaveTitle(new RegExp(escapeRegExp(qa.site.titleContains)));
 

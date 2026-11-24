@@ -3,7 +3,8 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['node_modules/**', 'vendor/**', 'test-results/**', 'playwright-report/**', 'blob-report/**'] },
+  // reference/: local, untracked reference scripts (never linted, type-checked or run).
+  { ignores: ['node_modules/**', 'vendor/**', 'test-results/**', 'playwright-report/**', 'blob-report/**', 'reference/**'] },
   ...tseslint.configs.recommendedTypeChecked,
   {
     languageOptions: {

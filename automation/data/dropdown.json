@@ -1,0 +1,17 @@
+{
+  "cities": [
+    { "label": "London", "value": "london" },
+    { "label": "Manchester", "value": "manchester" },
+    { "label": "Birmingham", "value": "birmingham" },
+    { "label": "Edinburgh", "value": "edinburgh" },
+    { "label": "Cardiff", "value": "cardiff" }
+  ],
+  "account": { "value": "8400023", "byIndex": { "index": 3, "value": "8400045" } },
+  "languages": {
+    "default": ["typescript"],
+    "selections": [
+      { "select": ["java", "python", "typescript"], "shown": "Java, Python, TypeScript" },
+      { "select": ["C#", "Go"], "values": ["csharp", "go"], "shown": "C#, Go" }
+    ]
+  }
+}

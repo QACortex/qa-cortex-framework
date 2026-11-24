@@ -17,22 +17,23 @@ export type DemoConfig = ConfigOf<typeof schema>;
 export const qaConfig = defineQaConfig({
   schema,
   // `base` applies to every profile; each profile overrides only what differs.
+  // The application under test is the QA Cortex Test Automation Lab. It has one public host, so
+  // every profile points at it; in a real project each profile names its own environment's host
+  // (for example https://staging.example.com/). Page objects use paths relative to baseURL.
   base: {
-    baseURL: 'https://demo.playwright.dev/todomvc/',
-    site: { label: 'local (Playwright TodoMVC demo)', titleContains: 'TodoMVC' },
+    baseURL: 'https://qacortex.com/lab-app/',
+    site: { label: 'local (QA Cortex Test Automation Lab)', titleContains: 'QA Cortex' },
   },
   profiles: {
     local: {},
     staging: {
-      baseURL: 'https://playwright.dev/',
-      site: { label: 'staging (playwright.dev)', titleContains: 'Playwright' },
+      site: { label: 'staging (simulated: QA Cortex Test Automation Lab)', titleContains: 'QA Cortex' },
     },
-    // SIMULATED production for the Production guard demo: a public, read-only page marked
-    // `production: true`, so the guard applies (no traces, videos or screenshots).
+    // SIMULATED production for the Production guard demo: the same public practice application,
+    // marked `production: true`, so the guard applies (no traces, videos or screenshots).
     production: {
       production: true,
-      baseURL: 'https://playwright.dev/',
-      site: { label: 'production (simulated: playwright.dev)', titleContains: 'Playwright' },
+      site: { label: 'production (simulated: QA Cortex Test Automation Lab)', titleContains: 'QA Cortex' },
     },
   },
 });

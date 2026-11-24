@@ -7,6 +7,11 @@ redacting logging** (`qaLog`) visible in the terminal and in Playwright's HTML r
 secrets** per profile from the environment or a local `.env`, the **Production guard**, and
 **reporter and artifact presets** for local, CI and production runs.
 
+It is also a **starter project**: page objects, a reusable UI component, JSON test data,
+data-driven tests and page object fixtures, with sample tests for the
+[QA Cortex Test Automation Lab](https://qacortex.com/lab-app/). Copy the pattern, replace the
+lab with your application, and start writing tests (see [Writing tests](#writing-tests)).
+
 It is an **independent npm project** (its own `package.json` and `package-lock.json`) and uses
 only the public package exports (`@qa-cortex/core/config`, `/logger`, `/secrets`, `/guard`,
 `/presets`). No
@@ -19,15 +24,23 @@ qa.config.ts              defineQaConfig(): schema extension (site) and profiles
 qa.secrets.ts             defineSecrets(): which environment variable holds each secret, per profile
 .env.example              placeholder values; copy to .env (gitignored) for local runs
 playwright.config.ts      .env loading, loadConfig(), loadSecrets(), the preset and the static production guard
+pages/                    page objects, one per lab scenario (plain classes, no base class)
+components/               UI parts shared by several pages (the lab's Scenarios menu)
+data/                     JSON test data (non-sensitive values only)
 tests/
-  fixtures.ts             config, logger, secrets and guard fixtures in the project's own test.extend()
+  fixtures.ts             config, logger, secrets, guard and page object fixtures in the project's own test
   ui/                     browser tests (all visit public websites)
+    navigation.spec.ts      lab menu (component), one test per scenario in data/scenarios.json
+    text-box.spec.ts        page object fixture, data-driven names, read-only vs disabled fields
+    check-box.spec.ts       default states, single selection, Select All / Deselect All
+    dropdown.spec.ts        select by label (one test per city), value and index; multiple select
+    text-validation.spec.ts negative and positive paths of a form; dynamic text
     site.spec.ts            profile-driven smoke test
     logging.spec.ts         logging demo: every level, structured data, redaction
-    HandlingBasicFunctionality.spec.ts   UI practice scenarios on vinothqaacademy.com
   failure/                intentional-failure demo; runs only via npm run demo:logging-failure
 scripts/                  demo runners and the framework packing helper
 vendor/                   packed @qa-cortex/core tarball (not committed; see vendor/README.md)
+reference/                optional local reference scripts: gitignored, never linted, type-checked or run
 ```
 
 Future test types get their own folders next to `tests/ui/` (for example `tests/api/`).
@@ -41,7 +54,6 @@ Future test types get their own folders next to `tests/ui/` (for example `tests/
 | `tests/fixtures.ts` | `configFixtures()`, `loggerFixtures()`, `secretsFixtures()` (after the logger, so every secret is redacted) and `productionGuardFixtures()` composed in the project's own `test` |
 | `tests/ui/site.spec.ts` | one browser test whose target and expectations come from the selected profile |
 | `tests/ui/logging.spec.ts` | logging demo: every level, structured data, `child()` context, secrets with `get()` and `find()`, redaction (passes) |
-| `tests/ui/HandlingBasicFunctionality.spec.ts` | plain Playwright UI scenarios (text box, radio, checkbox, drop-downs, basic auth…) against `vinothqaacademy.com` |
 | `tests/failure/logging-failure.spec.ts` | **intentional failure** demo for on-failure log attachments; excluded from every normal run |
 | `scripts/with-profile.mjs` | runs `playwright test` with `QA_CORTEX_PROFILE` set (works in any shell) |
 | `scripts/invalid-config.mjs` | loads a deliberately broken config and prints the `ConfigError` |
@@ -57,13 +69,16 @@ mandatory CI checks. Run them from this folder.
 
 | Profile | `baseURL` | Page title must contain |
 |---|---|---|
-| `local` (default) | https://demo.playwright.dev/todomvc/ | `TodoMVC` |
-| `staging` | https://playwright.dev/ | `Playwright` |
-| `production` (simulated) | https://playwright.dev/ | `Playwright` |
+| `local` (default) | https://qacortex.com/lab-app/ | `QA Cortex` |
+| `staging` (simulated) | https://qacortex.com/lab-app/ | `QA Cortex` |
+| `production` (simulated) | https://qacortex.com/lab-app/ | `QA Cortex` |
 
-All are public pages run by the Playwright project for demos and examples. The test only
-opens the page and reads its URL and title. `production` is a **simulation**: an ordinary
-public page marked `production: true`, so the Production guard applies to it.
+The application under test is the public **QA Cortex Test Automation Lab**, which has a single
+host, so every profile points at it and only the labels differ. In your own project, give each
+profile its environment's host (`baseURL: 'https://staging.example.com/'`). Page objects use
+paths relative to `baseURL`, so tests never change between environments. `production` is a
+**simulation**: the same practice application marked `production: true`, so the Production
+guard applies to it.
 
 ## Setup (once, inside `automation/`)
 
@@ -111,8 +126,64 @@ missing variable (never a value).
 | Command | What it does |
 |---|---|
 | `npm test` | Runs every browser test in `tests/ui/` (public websites; `tests/failure/` excluded). |
+| `npx playwright test tests/ui/text-box.spec.ts` | Runs one spec file; add `-g "Cardiff"` to run matching tests only. |
 | `npm run typecheck` | Type-checks configs, tests and scripts against the installed `@qa-cortex/core`. |
 | `npm run lint` | ESLint with type-aware rules. |
+
+## Writing tests
+
+The sample tests automate a few scenarios of the
+[QA Cortex Test Automation Lab](https://qacortex.com/lab-app/). Everything below is plain
+Playwright; QA Cortex only adds configuration, secrets, logging and safety checks.
+
+| Piece | Where | Rule |
+|---|---|---|
+| Page object | `pages/<name>.page.ts` | One class per page: typed `Locator` fields, an `open()` using a path relative to `baseURL`, and actions named after what the user does (`submitAccountNumber()`). **No assertions, no base class.** |
+| Component | `components/<name>.ts` | A part several pages share (the lab's Scenarios menu). Pages **hold** one (`readonly menu = new ScenarioMenu(page)`) instead of inheriting it. |
+| Test data | `data/<name>.json` | Non-sensitive values only. Import with `import data from '../../data/x.json' with { type: 'json' }`: typed, no loader needed. Credentials belong in `qa.secrets.ts` and `.env`. |
+| Data-driven test | the spec | A loop that declares one test per record (`for (const city of data.cities) test(...)`): each record is a separate test in the report and can run in parallel. |
+| Page object fixture | `tests/fixtures.ts` | Add one line per page object: `myPage: ({ page }, use) => use(new MyPage(page))`. Tests then ask for `myPage`. |
+| Expectations | the spec | Web-first assertions (`await expect(locator).toHaveText(...)`) in the test, so the business flow reads top to bottom. No fixed waits (`waitForTimeout`): assertions wait by themselves. |
+| Logging | the spec | `qaLog.info('transfer completed', { ... })`: structured, redacted, attached to the report. |
+
+A new page in four steps:
+
+1. Create `pages/orders.page.ts`:
+
+   ```ts
+   import type { Locator, Page } from '@playwright/test';
+
+   export class OrdersPage {
+     static readonly path = '#/orders';
+     readonly heading: Locator;
+     readonly search: Locator;
+
+     constructor(readonly page: Page) {
+       this.heading = page.getByRole('heading', { level: 1, name: 'Orders' });
+       this.search = page.getByRole('searchbox', { name: 'Search orders' });
+     }
+
+     async open(): Promise<void> {
+       await this.page.goto(OrdersPage.path);
+     }
+   }
+   ```
+
+2. Register it in `tests/fixtures.ts` (`PageFixtures` type and `.extend<PageFixtures>({ ... })`).
+3. Put its test data in `data/orders.json`.
+4. Write `tests/ui/orders.spec.ts`, importing `test` and `expect` from `../fixtures.js`:
+
+   ```ts
+   test('finds an order', async ({ ordersPage }) => {
+     await ordersPage.open();
+     await ordersPage.search.fill('A-1001');
+     await expect(ordersPage.page.getByRole('row', { name: /A-1001/ })).toBeVisible();
+   });
+   ```
+
+Not added on purpose, because Playwright already provides them: wrappers around `click`/`fill`,
+custom waits, retry helpers and a base page class. Browsers, retries and parallel settings,
+Allure and a CI workflow are planned for the next steps.
 
 ## Run the demonstrations
 
@@ -166,8 +237,9 @@ npm run typecheck
 ## What to look for
 
 - The first line of every run: `[qa-cortex] profile=… baseURL=…`.
-- In the test output: `profile=… url=… title="…"`, which differs between `local` and `staging`
-  while the test code is identical.
+- In the test output: `profile=… url=… title="…"`, and in the HTML report the `environment`
+  annotation with the profile's label, which differs between `local` and `staging` while the
+  test code is identical.
 - In the error demos: every problem listed at once, each with the layer that caused it
   (`[base]`, `[profile "local"]`, `[env QA_CORTEX_PROFILE]`), and no config values printed.
 

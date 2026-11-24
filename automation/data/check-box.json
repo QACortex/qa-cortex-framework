@@ -1,0 +1,12 @@
+{
+  "total": 7,
+  "categories": [
+    { "name": "Electronics", "checkedByDefault": true },
+    { "name": "Clothing", "checkedByDefault": false },
+    { "name": "Home & Kitchen", "checkedByDefault": false },
+    { "name": "Sports & Outdoors", "checkedByDefault": false },
+    { "name": "Books", "checkedByDefault": false },
+    { "name": "Beauty & Personal Care", "checkedByDefault": false }
+  ],
+  "unavailable": "Premium Products (Unavailable)"
+}

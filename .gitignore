@@ -19,6 +19,10 @@ allure-report/
 .env.*
 !.env.example
 
+# Local reference scripts (automation/reference/): source material for the starter project,
+# kept on the author's machine only; never tracked
+automation/reference/
+
 # Local tool settings
 .claude/settings.local.json
 .idea/
