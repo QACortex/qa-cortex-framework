@@ -1,24 +1,48 @@
-# Config and logging demo: `@qa-cortex/core`
+# QA Cortex automation project
 
-A small Playwright project showing what QA Cortex provides today: one typed configuration
-with environment **profiles**, switched with **`QA_CORTEX_PROFILE`**, validated before any
-test runs, a readable **`ConfigError`** when something is wrong, and **structured, redacting
-logging** (`qaLog`) visible in the terminal and in Playwright's HTML report.
+A ready-to-use Playwright automation project built on `@qa-cortex/core`: one typed
+configuration with environment **profiles**, switched with **`QA_CORTEX_PROFILE`**, validated
+before any test runs, a readable **`ConfigError`** when something is wrong, and **structured,
+redacting logging** (`qaLog`) visible in the terminal and in Playwright's HTML report.
 
-It uses the real package exports (`@qa-cortex/core/config`, `@qa-cortex/core/logger`) through
-the npm workspace. No QA Cortex logic is copied here.
+It is an **independent npm project** (its own `package.json` and `package-lock.json`) and uses
+only the public package exports (`@qa-cortex/core/config`, `@qa-cortex/core/logger`). No
+QA Cortex logic is copied here, and nothing depends on the framework folder at run time.
+
+## Layout
+
+```
+qa.config.ts              defineQaConfig(): schema extension (site) and profiles local / staging
+playwright.config.ts      loadConfig() at the top of Playwright's own config; baseURL mapped into use
+tests/
+  fixtures.ts             configFixtures() + loggerFixtures() in the project's own test.extend()
+  ui/                     browser tests (all visit public websites)
+    site.spec.ts            profile-driven smoke test
+    logging.spec.ts         logging demo: every level, structured data, redaction
+    HandlingBasicFunctionality.spec.ts   UI practice scenarios on vinothqaacademy.com
+  failure/                intentional-failure demo; runs only via npm run demo:logging-failure
+scripts/                  demo runners and the framework packing helper
+vendor/                   packed @qa-cortex/core tarball (not committed; see vendor/README.md)
+```
+
+Future test types get their own folders next to `tests/ui/` (for example `tests/api/`).
 
 | File | What it shows |
 |---|---|
 | `qa.config.ts` | `defineQaConfig()`: a schema extension (`site`) and two profiles, `local` and `staging` |
 | `playwright.config.ts` | `loadConfig()` at the top of Playwright's own config; `baseURL` mapped into `use`; log level and attachment policy; list + HTML reporters |
 | `tests/fixtures.ts` | `configFixtures()` and `loggerFixtures()` composed in the project's own `test.extend()`; `qaSecrets` override with a synthetic secret |
-| `tests/logging.spec.ts` | logging demo: every level, structured data, `child()` context, redaction (passes) |
+| `tests/ui/site.spec.ts` | one browser test whose target and expectations come from the selected profile |
+| `tests/ui/logging.spec.ts` | logging demo: every level, structured data, `child()` context, redaction (passes) |
+| `tests/ui/HandlingBasicFunctionality.spec.ts` | plain Playwright UI scenarios (text box, radio, checkbox, drop-downs, basic auth…) against `vinothqaacademy.com` |
 | `tests/failure/logging-failure.spec.ts` | **intentional failure** demo for on-failure log attachments; excluded from every normal run |
-| `tests/site.spec.ts` | one browser test whose target and expectations come from the selected profile |
 | `scripts/with-profile.mjs` | runs `playwright test` with `QA_CORTEX_PROFILE` set (works in any shell) |
 | `scripts/invalid-config.mjs` | loads a deliberately broken config and prints the `ConfigError` |
 | `scripts/logging-demo.mjs` | runs the logging demo (`success` or `failure`) with a fresh synthetic secret |
+| `scripts/pack-framework.mjs` | inside this repository only: builds `../framework` and writes `vendor/qa-cortex-core.tgz` |
+
+All browser tests here visit public websites, so they are **not** part of the framework's
+mandatory CI checks. Run them from this folder.
 
 ## Profiles
 
@@ -30,24 +54,44 @@ the npm workspace. No QA Cortex logic is copied here.
 Both are public pages run by the Playwright project for demos and examples. The test only
 opens the page and reads its URL and title.
 
-## Setup (once, from the repository root)
+## Setup (once, inside `automation/`)
+
+`@qa-cortex/core` is not published yet, so this project installs it from a packed tarball at
+`vendor/qa-cortex-core.tgz`.
+
+> **Temporary dependency, must be replaced before Release 1.** `package.json` currently has
+> `"@qa-cortex/core": "file:vendor/qa-cortex-core.tgz"`. Once `@qa-cortex/core` is published to
+> npm, and before Release 1 is tagged:
+> 1. Replace that entry with the published version range (for example `"^1.0.0"`).
+> 2. Run `npm install` to regenerate `package-lock.json` against the npm registry.
+> 3. Delete `vendor/` and `scripts/pack-framework.mjs`, and remove the `framework:pack` script.
+> 4. Update this setup section and the root README to use a plain `npm install`.
+
+Inside the qa-cortex repository (builds `../framework` and writes the tarball):
 
 ```powershell
+cd automation
+npm run framework:pack
 npm install
-npm run build
 npx playwright install chromium
 ```
 
-`npm run build` compiles `@qa-cortex/core`; the demo imports its built output.
-Skip the last command if Chromium for Playwright 1.65.1 is already installed.
+Outside the repository, copy a `@qa-cortex/core` tarball to `vendor/qa-cortex-core.tgz`, then
+run `npm install` and `npx playwright install chromium`.
+
+`npm install` (not `npm ci`) is the right command after re-packing: the lockfile records the
+tarball's checksum, so it changes whenever the framework's packaged contents change.
+Skip the browser install if Chromium for Playwright 1.65.1 is already installed.
+
+| Command | What it does |
+|---|---|
+| `npm test` | Runs every browser test in `tests/ui/` (public websites; `tests/failure/` excluded). |
+| `npm run typecheck` | Type-checks configs, tests and scripts against the installed `@qa-cortex/core`. |
+| `npm run lint` | ESLint with type-aware rules. |
 
 ## Run the demonstrations
 
-From `examples/config-demo`:
-
-```powershell
-cd examples/config-demo
-```
+From `automation/`.
 
 **1. Local profile (the default)**
 
@@ -64,11 +108,11 @@ npm run demo:staging
 The same test, setting the variable yourself:
 
 ```powershell
-$env:QA_CORTEX_PROFILE = "staging"; npx playwright test; Remove-Item Env:QA_CORTEX_PROFILE
+$env:QA_CORTEX_PROFILE = "staging"; npx playwright test tests/ui/site.spec.ts; Remove-Item Env:QA_CORTEX_PROFILE
 ```
 
 ```bash
-QA_CORTEX_PROFILE=staging npx playwright test
+QA_CORTEX_PROFILE=staging npx playwright test tests/ui/site.spec.ts
 ```
 
 **3. Unknown profile: the run stops before any browser starts**
@@ -162,4 +206,4 @@ Redaction applies only to what `qaLog` writes. Playwright's own artifacts are no
 - action parameters
 - assertion and failure messages
 
-That's why the failing test keeps the secret out of its assertion, and why the secret is never written as a literal in test source: traces and the HTML report embed source code. See the main README and ADR 0007.
+That's why the failing test keeps the secret out of its assertion, and why the secret is never written as a literal in test source: traces and the HTML report embed source code. See the main README and ADR 0007 (`framework/docs/adr/0007-logging.md`).

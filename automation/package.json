@@ -1,0 +1,34 @@
+{
+  "name": "qa-cortex-automation",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Ready-to-use Playwright automation project built on @qa-cortex/core: config profiles, fixtures and structured logging.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "framework:pack": "node scripts/pack-framework.mjs",
+    "test": "playwright test",
+    "typecheck": "tsc -p .",
+    "lint": "eslint .",
+    "demo:local": "node scripts/with-profile.mjs local tests/ui/site.spec.ts tests/ui/logging.spec.ts",
+    "demo:staging": "node scripts/with-profile.mjs staging tests/ui/site.spec.ts tests/ui/logging.spec.ts",
+    "demo:unknown-profile": "node scripts/with-profile.mjs qa",
+    "demo:invalid": "node scripts/invalid-config.mjs",
+    "demo:logging": "node scripts/logging-demo.mjs success",
+    "demo:logging-failure": "node scripts/logging-demo.mjs failure",
+    "report": "playwright show-report"
+  },
+  "dependencies": {
+    "@qa-cortex/core": "file:vendor/qa-cortex-core.tgz"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "22.20.5",
+    "eslint": "9.39.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0"
+  }
+}

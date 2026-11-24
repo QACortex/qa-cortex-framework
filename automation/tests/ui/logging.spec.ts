@@ -1,6 +1,6 @@
 // Logging demo (passing). Run with: npm run demo:logging
 // Shows every level, structured data, child context and redaction of a synthetic secret.
-import { DEMO_SECRET, expect, test } from './fixtures.js';
+import { DEMO_SECRET, expect, test } from '../fixtures.js';
 
 test('logs at every level while visiting the selected environment', async ({ page, qaConfig, qaLog }) => {
   // child(): every record below carries this context.

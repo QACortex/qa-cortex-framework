@@ -1,12 +1,12 @@
-# Continuous integration for QA Cortex.
+# Continuous integration for the QA Cortex framework (the npm project in framework/).
 #
 # One job on Ubuntu + Node.js 22 (the minimum supported major, engines ">=22.12").
-# The compatibility matrix (Node 24/26, Windows, Playwright 1.60 floor) comes later (Step 7B).
+# The OS x Node x Playwright matrix lives in compatibility.yml.
 #
-# What runs: the same npm scripts a contributor runs locally, in dependency order.
-# What does NOT run: the browser demos in examples/ (they visit public websites, and
-# examples/config-demo/tests/failure/ fails on purpose). `npm test` only runs
-# packages/*/test, and none of those tests start a browser, so no browsers are installed.
+# What runs: the same npm scripts a contributor runs in framework/, in dependency order.
+# What does NOT run: browser tests that visit public websites, or that fail on purpose
+# (the demo/automation project). `npm test` only runs framework/packages/*/test, and none
+# of those tests start a browser, so no browsers are installed.
 #
 # Nothing is published or deployed from this workflow.
 
@@ -33,6 +33,10 @@ jobs:
     name: Build, type-check, lint, test (Node 22, Ubuntu)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Every `run:` step works inside the framework project.
+    defaults:
+      run:
+        working-directory: framework
 
     steps:
       # Actions are pinned to full commit SHAs (supply-chain safety); the comment is the release.
@@ -46,15 +50,16 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: framework/package-lock.json
 
-      - name: Install dependencies (from package-lock.json)
+      - name: Install dependencies (from framework/package-lock.json)
         run: npm ci
 
       # Compiles @qa-cortex/core to dist/. Later steps import the built package.
       - name: Build
         run: npm run build
 
-      # Package tests, root tool configs and the examples, against the built package.
+      # Package tests, tool configs and the compat consumer template, against the built package.
       - name: Type-check
         run: npm run typecheck
 
@@ -62,7 +67,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # packages/*/test only (no browsers needed; examples are excluded).
+      # framework/packages/*/test only (no browsers needed).
       - name: Test
         run: npm test
 
@@ -71,11 +76,12 @@ jobs:
         run: npm run pack:check
 
       # Test output (error context, nested-run traces) for diagnosing failures only.
+      # `path` is relative to the repository root, not to the working directory above.
       - name: Upload test results on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results
-          path: test-results/
+          path: framework/test-results/
           retention-days: 7
           if-no-files-found: ignore

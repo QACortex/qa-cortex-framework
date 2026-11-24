@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js';
+import { expect, test } from '../fixtures.js';
 
 test('opens the home page of the selected environment', async ({ page, qaConfig: qa }, testInfo) => {
   testInfo.annotations.push({ type: 'environment', description: `${qa.profile}: ${qa.site.label} → ${qa.baseURL}` });

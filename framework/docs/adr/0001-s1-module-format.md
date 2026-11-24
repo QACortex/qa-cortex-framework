@@ -1,6 +1,6 @@
 # ADR 0001 — S1 module format: ship ESM-only
 
-- Status: accepted (spike S1, 2026-11-23). Amended by the two dated addenda at the end (Step 3 review, Step 3B validation); finalised 2026-11-23. Only Node 22/24 runtime checks remain, pending CI.
+- Status: accepted (spike S1, 2026-11-23). Amended by the three dated addenda at the end (Step 3 review, Step 3B validation, Step 7B CI results). The Node 22/24 runtime checks passed in CI; one detail (the Node 22.12.0 warning) is still to be read from the run's job summaries.
 - Spike code: `spikes/s1-module-format/` (throwaway)
 - Versions tested: Node 26.13.1, TypeScript 7.0.2 (+ 6.0.3 API), `@playwright/test` 1.65.1 and 1.60.0, attw 0.18.5, publint 0.3.25
 
@@ -181,3 +181,47 @@ These results show the package *format* works. They don't prove that the real `@
 
 ### Tooling note
 A globally installed TypeScript can be picked up by `npx tsc` in a folder without a local install; it happened once during these runs. Project scripts must call the workspace's local `tsc`.
+
+## Addendum: CI compatibility results (Step 7B, recorded 2026-11-24)
+This section records the first run of the Compatibility workflow (`.github/workflows/compatibility.yml`,
+added in commit `df7fe29`). **No change to the decision or to the package manifest.**
+
+**Scope.** Unlike the earlier addenda, these results are for the **real `@qa-cortex/core`**
+(config and logger modules, `0.0.0`), not the S1 stub. The tarball was packed once in CI and
+installed into isolated consumer projects outside the repository, with no workspace links.
+
+### What ran
+- **Package job** (Ubuntu, Node 22): `pack:check`, `publint --strict` and
+  `attw --pack --profile esm-only` on the packed tarball.
+- **Consumer matrix**, 12 jobs: `ubuntu-latest` and `windows-latest` × Node `22.12.0`, `24` and
+  `26` × Playwright `1.60.0` and `1.65.1`. Each job ran a CommonJS and an ESM consumer:
+  - `probe.cjs` (`require()`) and `probe.mjs` (`import`) of every subpath
+  - a consumer type-check against that Playwright version
+  - the config and logger fixture tests
+  - a Chromium smoke test against a local server (no external websites)
+
+### Result
+The run passed: the package job and all 12 consumer jobs (24 consumer runs) were green.
+
+### Updates to the open items and required tests above
+- **Node floor `>=22.12`: verified.** `require()` of ESM works on Node 22.12.0, 24 and 26, in
+  CommonJS and ESM consumers. This closes the "Node floor not verified locally" item and the
+  "Node.js 22 and 24 runtime compatibility" pending item.
+- **Platforms:** Linux and Windows verified (required test 4). **macOS is still untested.**
+- **Playwright types:** the real package type-checks against Playwright 1.60.0 and 1.65.1
+  (required test 2), which the stub-only results above could not show.
+- **Publish checks** on the real tarball pass (required test 5).
+- **Required test 1** (CJS and ESM smoke tests on Node 22.12.0, 24 and 26) passes.
+
+### Still open
+- **Node 22.12.0 warning.** Whether 22.12.0 printed the one-time `require(esm)`
+  ExperimentalWarning was not recorded here. Each consumer job's summary has a `probe.cjs` row
+  ending in `warnings: …`; read it from the Node 22.12.0 jobs. It only decides whether the
+  minimum moves to `>=22.13`; the run already shows 22.12.0 works.
+- **TypeScript 5.8 / 5.9 consumers** (required test 3) are not in the CI matrix; the evidence is
+  still the local Step 3B run on the stub.
+- **Node "latest 22.x"** is not a separate matrix entry; only 22.12.0 is.
+- **Playwright 1.61–1.64** remain untested (inside the peer range, assumed to work).
+- **npm scope:** the `qa-cortex` npm org still has to be created before publishing.
+- Paths in this ADR that predate Step 8 (`examples/`, `spikes/`, `compat/`) are relative to
+  the old repository root; the framework now lives under `framework/`.

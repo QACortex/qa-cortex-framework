@@ -7,59 +7,52 @@ It is not a framework with its own runtime: raw Playwright always stays usable.
 
 ## Repository structure
 
+One GitHub repository, two independent npm projects, each with its own `package.json` and
+lockfile:
+
 ```
-packages/
-  core/                 @qa-cortex/core (ESM-only, subpath exports)
-    src/config/         @qa-cortex/core/config (typed, layered config; see ADR 0002)
-    src/logger/         @qa-cortex/core/logger (structured, redacting logging; see ADR 0007)
-    test/               package tests, run against the built output
-      types/            compile-only type tests (checked by `npm run typecheck`)
-      fixtures/         nested Playwright projects run by the integration tests
-examples/
-  config-demo/          runnable demo of @qa-cortex/core/config (see its README)
-docs/adr/               architecture decision records (start here)
-spikes/                 M0 technical spikes (S0–S4), kept as history; not built or linted
-tsconfig.base.json      shared compiler settings
-eslint.config.js        lint rules (type-aware)
-playwright.config.ts    test runner for package tests
+framework/              framework development and npm packaging (see framework/README.md)
+  packages/core/        @qa-cortex/core: config (ADR 0002) and logger (ADR 0007)
+  compat/               packed-package consumer checks
+  docs/adr/             architecture decision records (start here)
+  spikes/               M0 technical spikes, kept as history
+automation/             ready-to-use automation project (see automation/README.md)
+  tests/ui/             browser tests (public websites; not part of framework CI)
+  vendor/               packed @qa-cortex/core tarball until the package is published
+.github/workflows/      CI and Compatibility, both run inside framework/
 ```
+
+## Using QA Cortex in a test project
+
+```powershell
+cd automation
+npm run framework:pack
+npm install
+npm run demo:local
+```
+
+See [automation/README.md](automation/README.md) for every demo and command.
+
+Until `@qa-cortex/core` is published, `automation/` installs it from a packed tarball
+(`file:vendor/qa-cortex-core.tgz`). This is temporary: it must be replaced with the published
+npm dependency before Release 1 (steps in [automation/README.md](automation/README.md#setup-once-inside-automation)).
 
 ## Requirements
 
 - Node.js >= 22.12
-- npm (workspaces)
+- npm
 
-## Development commands
-
-Run from the repository root:
-
-| Command | What it does |
-|---|---|
-| `npm install` | Installs all workspace dependencies. |
-| `npm run build` | Compiles every package with `tsc -b` (JS, `.d.ts`, declaration maps). |
-| `npm run typecheck` | Builds, then type-checks the tests, root tool configs and the examples against the built packages. |
-| `npm run lint` | Runs ESLint with type-aware rules (packages and examples). |
-| `npm test` | Builds, then runs the package tests with Playwright Test. |
-| `npm run pack:check` | After a build: dry-run `npm pack` of `@qa-cortex/core`; fails if an `exports` target, `LICENSE` or `package.json` would be missing, or if build caches or tests would be published. Nothing is published. |
-| `npm run pack:lint` | After a build: `publint --strict` and Are the Types Wrong (`attw --profile esm-only`) on the packed package (ADR 0001). |
-| `npm run clean` | Removes build output. |
-
-CI (`.github/workflows/ci.yml`) runs `npm ci`, then `build`, `typecheck`, `lint`, `test` and
-`pack:check` on Ubuntu with Node.js 22, for pushes and pull requests to `main`.
-
-Compatibility (`.github/workflows/compatibility.yml`, on pull requests to `main` and on demand)
-packs `@qa-cortex/core` once, runs `pack:check` and `pack:lint` once, then installs the
-**tarball** into isolated CommonJS and ESM consumer projects on Ubuntu and Windows ×
-Node.js 22.12.0 / 24 / 26 × Playwright 1.60.0 / 1.65.1. To run one consumer locally after
-`npm run build` and `npm pack --workspace @qa-cortex/core --pack-destination <dir>`:
+## Working on the framework
 
 ```powershell
-node compat/run-consumer.mjs --tarball <dir> --playwright 1.65.1 --format cjs --install-browser
+cd framework
+npm ci
+npm test
 ```
 
-`npm test` runs only `packages/*/test`. The browser tests in `examples/` visit public
-websites, so they are **not** part of the mandatory suite; run them from each example's
-folder (see `examples/config-demo/README.md`).
+All framework commands (build, typecheck, lint, test, package checks), the CI workflows and
+the compatibility matrix are described in [framework/README.md](framework/README.md).
+Browser tests that visit public websites are not part of the framework checks.
 
 ## Configuration (`@qa-cortex/core/config`)
 
@@ -142,7 +135,7 @@ test('uses the config', async ({ page, qaConfig }) => {
 
 - Your own fixtures can depend on `qaConfig` by name, and the fixtures combine with `mergeTests()`.
 - `test.use({ qaProfile })` must sit at the top level of a spec file (Playwright rule for worker options), not inside `describe()`.
-- When projects use different profiles, derive each project's `baseURL` from the same profile. See [ADR 0006](docs/adr/0006-fixtures.md).
+- When projects use different profiles, derive each project's `baseURL` from the same profile. See [ADR 0006](framework/docs/adr/0006-fixtures.md).
 
 ## Logging (`@qa-cortex/core/logger`)
 
@@ -195,12 +188,12 @@ It applies **only to output generated by the QA Cortex logger** (its console lin
 **traces, screenshots, videos, network traffic (HAR and trace network logs), action parameters,
 assertion messages and failure output**, or reports built from them. Treat those artifacts as
 secret-bearing and keep traces off in production. See
-[ADR 0003](docs/adr/0003-s3-trace-secrets.md) and [ADR 0007](docs/adr/0007-logging.md).
+[ADR 0003](framework/docs/adr/0003-s3-trace-secrets.md) and [ADR 0007](framework/docs/adr/0007-logging.md).
 
 ## Key decisions
 
-- **ESM-only.** Packages expose subpaths only (`@qa-cortex/core/config`), never the package root. CommonJS projects load them through `require()` of ESM, which needs Node 22.12+ and, for type-checking with `nodenext`, TypeScript 5.8+. See [ADR 0001](docs/adr/0001-s1-module-format.md).
-- **One compiler.** TypeScript 6.0.3, pinned exactly. See [ADR 0005](docs/adr/0005-single-compiler-typescript-6.md).
+- **ESM-only.** Packages expose subpaths only (`@qa-cortex/core/config`), never the package root. CommonJS projects load them through `require()` of ESM, which needs Node 22.12+ and, for type-checking with `nodenext`, TypeScript 5.8+. See [ADR 0001](framework/docs/adr/0001-s1-module-format.md).
+- **One compiler.** TypeScript 6.0.3, pinned exactly. See [ADR 0005](framework/docs/adr/0005-single-compiler-typescript-6.md).
 - **Playwright is a peer dependency** (`>=1.60.0 <2`). Core only imports its types.
 
 ## Licence
