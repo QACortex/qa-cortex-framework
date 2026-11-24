@@ -1,6 +1,6 @@
 # ADR 0003 — S3: Playwright artifacts leak secrets; treat them as secrets, keep them off in production
 
-- Status: accepted (spike S3, 2026-11-23)
+- Status: accepted (spike S3, 2026-11-23). Module 2 (Production guard) is implemented as decided here; see ADR 0008, which also records the guard's measured limits.
 - Spike code: `spikes/s3-trace-secrets/`. Raw matrices are in `results/leak-matrix-{baseline,lean}.md`.
 - Versions tested: Node 26.13.1, `@playwright/test` 1.65.1, Chromium only (build 1255)
 

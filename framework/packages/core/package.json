@@ -1,7 +1,7 @@
 {
   "name": "@qa-cortex/core",
   "version": "0.0.0",
-  "description": "QA Cortex core modules for Playwright: configuration and structured logging.",
+  "description": "QA Cortex core modules for Playwright: configuration, structured logging, secrets and the production guard.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -12,6 +12,14 @@
     "./logger": {
       "types": "./dist/logger/index.d.ts",
       "default": "./dist/logger/index.js"
+    },
+    "./secrets": {
+      "types": "./dist/secrets/index.d.ts",
+      "default": "./dist/secrets/index.js"
+    },
+    "./guard": {
+      "types": "./dist/guard/index.d.ts",
+      "default": "./dist/guard/index.js"
     },
     "./package.json": "./package.json"
   },

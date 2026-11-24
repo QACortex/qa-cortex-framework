@@ -1,31 +1,23 @@
 // The project's own `test`, extended with QA Cortex fixtures:
-//   config: qaConfig (validated, frozen, once per worker) and qaProfile (per-project option)
-//   logger: qaLog (per test), qaLogLevel / qaLogAttach (options) and qaSecrets (redaction list)
-import { randomUUID } from 'node:crypto';
+//   config:  qaConfig (validated, frozen, once per worker) and qaProfile (per-project option)
+//   logger:  qaLog (per test), qaLogLevel / qaLogAttach (options)
+//   secrets: qaSecretStore (typed secrets for the profile); also fills the logger's qaSecrets,
+//            so every loaded secret is redacted in qaLog output
+//   guard:   qaProductionGuard (automatic): in a production profile, fails the worker before a
+//            browser starts if traces, videos or screenshots would be recorded (even via --trace on)
 import { test as base } from '@playwright/test';
 import { configFixtures, type ConfigWorkerFixtures } from '@qa-cortex/core/config';
+import { productionGuardFixtures, type ProductionGuardWorkerFixtures } from '@qa-cortex/core/guard';
 import { loggerFixtures, type LoggerTestFixtures, type LoggerWorkerFixtures } from '@qa-cortex/core/logger';
+import { secretsFixtures, type SecretsWorkerFixtures } from '@qa-cortex/core/secrets';
 import { qaConfig, type schema } from '../qa.config.js';
+import { secretsDef, type ProjectSecrets } from '../qa.secrets.js';
 
-/**
- * SYNTHETIC secret for the logging demo: not a real credential. `scripts/logging-demo.mjs`
- * generates a fresh one per run. It is deliberately never written as a literal in source:
- * traces and the HTML report embed test source code, so a literal would appear there no
- * matter what the logger does.
- */
-export const DEMO_SECRET = process.env.QAC_DEMO_SECRET ?? `demo-synthetic-${randomUUID()}`;
-
-const withConfig = base.extend<object, ConfigWorkerFixtures<typeof schema>>(configFixtures(qaConfig));
-
-export const test = withConfig.extend<LoggerTestFixtures, LoggerWorkerFixtures>({
-  ...loggerFixtures(),
-  // In a real project these values come from a vault or the environment, never from `use`.
-  qaSecrets: [
-    async ({}, use) => {
-      await use([DEMO_SECRET]);
-    },
-    { scope: 'worker' },
-  ],
-});
+export const test = base
+  .extend<object, ConfigWorkerFixtures<typeof schema>>(configFixtures(qaConfig))
+  .extend<LoggerTestFixtures, LoggerWorkerFixtures>(loggerFixtures())
+  // After loggerFixtures(): its qaSecrets replaces the logger's empty default.
+  .extend<object, SecretsWorkerFixtures<ProjectSecrets>>(secretsFixtures(secretsDef))
+  .extend<object, ProductionGuardWorkerFixtures>(productionGuardFixtures());
 
 export { expect } from '@playwright/test';

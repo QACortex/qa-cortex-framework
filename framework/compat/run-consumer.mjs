@@ -9,7 +9,7 @@
 //   1. probe.cjs   require() of every subpath, root and deep imports blocked
 //   2. probe.mjs   import of every subpath, import/require share one instance
 //   3. tsc         consumer type-check, skipLibCheck: false, against that Playwright version
-//   4. playwright  config + logger fixture tests and a Chromium smoke test (local server)
+//   4. playwright  config, logger, secrets and guard fixture tests and a Chromium smoke test (local server)
 // Exits 1 if any step fails. Appends a summary to $GITHUB_STEP_SUMMARY when set.
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -80,8 +80,8 @@ step('playwright test: fixtures + Chromium smoke', [playwrightCli, 'test'], {
       ? 'the synthetic secret appeared in the output'
       : !out.includes('[REDACTED]')
         ? 'no [REDACTED] log line found in the output'
-        : !/3 passed/.test(out)
-          ? 'expected "3 passed"'
+        : !/4 passed/.test(out)
+          ? 'expected "4 passed"'
           : undefined,
   note: (out) => /\d+ passed[^\n]*/.exec(out)?.[0] ?? '',
 });

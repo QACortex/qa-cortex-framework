@@ -27,5 +27,12 @@ export const qaConfig = defineQaConfig({
       baseURL: 'https://playwright.dev/',
       site: { label: 'staging (playwright.dev)', titleContains: 'Playwright' },
     },
+    // SIMULATED production for the Production guard demo: a public, read-only page marked
+    // `production: true`, so the guard applies (no traces, videos or screenshots).
+    production: {
+      production: true,
+      baseURL: 'https://playwright.dev/',
+      site: { label: 'production (simulated: playwright.dev)', titleContains: 'Playwright' },
+    },
   },
 });
