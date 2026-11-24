@@ -2,7 +2,7 @@
 import data from '../../data/dropdown.json' with { type: 'json' };
 import { expect, test } from '../fixtures.js';
 
-test.describe('Dropdown (HTML Select)', () => {
+test.describe('Dropdown (HTML Select)', { tag: '@regression' }, () => {
   test.beforeEach(async ({ dropdownPage }) => {
     await dropdownPage.open();
     await expect(dropdownPage.heading).toBeVisible();

@@ -2,7 +2,7 @@
 import data from '../../data/check-box.json' with { type: 'json' };
 import { expect, test } from '../fixtures.js';
 
-test.describe('Check Box', () => {
+test.describe('Check Box', { tag: '@regression' }, () => {
   test.beforeEach(async ({ checkBoxPage }) => {
     await checkBoxPage.open();
     await expect(checkBoxPage.heading).toBeVisible();

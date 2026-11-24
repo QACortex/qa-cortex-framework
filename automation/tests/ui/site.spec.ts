@@ -1,6 +1,6 @@
 import { expect, test } from '../fixtures.js';
 
-test('opens the home page of the selected environment', async ({ page, qaConfig: qa }, testInfo) => {
+test('opens the home page of the selected environment', { tag: '@smoke' }, async ({ page, qaConfig: qa }, testInfo) => {
   testInfo.annotations.push({ type: 'environment', description: `${qa.profile}: ${qa.site.label} → ${qa.baseURL}` });
 
   // './' resolves against baseURL, which comes from the selected QA Cortex profile.

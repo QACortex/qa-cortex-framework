@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const cli = createRequire(import.meta.url).resolve('@playwright/test/cli');
-const args = ['test', 'tests/ui/site.spec.ts', 'tests/ui/logging.spec.ts'];
+const args = ['test', '--project=chromium', 'tests/ui/site.spec.ts', 'tests/ui/logging.spec.ts'];
 
 console.log(`> QA_CORTEX_PRESET=ci playwright ${args.join(' ')}`);
 const child = spawn(process.execPath, [cli, ...args], { stdio: 'inherit', env: { ...process.env, QA_CORTEX_PRESET: 'ci' } });

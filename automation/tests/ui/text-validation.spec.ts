@@ -3,7 +3,7 @@
 import data from '../../data/text-validation.json' with { type: 'json' };
 import { expect, test } from '../fixtures.js';
 
-test.describe('Text Validation: fund transfer form', () => {
+test.describe('Text Validation: fund transfer form', { tag: '@regression' }, () => {
   test.beforeEach(async ({ textValidationPage }) => {
     await textValidationPage.open();
     await expect(textValidationPage.formHeading).toHaveText('Fund Transfer');
@@ -15,7 +15,8 @@ test.describe('Text Validation: fund transfer form', () => {
     await expect(textValidationPage.accountNumberSuccess).toBeHidden();
   });
 
-  test('a valid account number is verified and the transfer completes', async ({ textValidationPage, qaLog }) => {
+  // Also @smoke: the main business flow of this page. Tags add up: describe @regression + test @smoke.
+  test('a valid account number is verified and the transfer completes', { tag: '@smoke' }, async ({ textValidationPage, qaLog }) => {
     await textValidationPage.submitAccountNumber(data.validAccountNumber);
     await expect(textValidationPage.accountNumberSuccess).toHaveText(data.messages.verified);
     await expect(textValidationPage.accountNumberError).toBeHidden();

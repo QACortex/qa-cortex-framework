@@ -20,7 +20,7 @@ const secret = `demo-synthetic-${randomBytes(6).toString('hex')}`;
 const env = { ...process.env, QA_CORTEX_PROFILE: 'local', QA_DEMO_TOKEN: secret };
 const args = ['test'];
 if (mode === 'success') {
-  args.push('tests/ui/logging.spec.ts');
+  args.push('--project=chromium', 'tests/ui/logging.spec.ts');
   delete env.QAC_DEMO_FAILURE;
 } else {
   env.QAC_DEMO_FAILURE = '1';
