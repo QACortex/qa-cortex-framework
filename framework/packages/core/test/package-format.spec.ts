@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const run = promisify(execFile);
 
 test.describe('package format (ESM-only, subpath exports)', () => {
-  for (const subpath of ['config', 'logger']) {
+  for (const subpath of ['config', 'logger', 'secrets', 'guard']) {
     test(`./${subpath} resolves to the built dist entry`, () => {
       const resolved = require.resolve(`@qa-cortex/core/${subpath}`);
       expect(resolved.endsWith(join('dist', subpath, 'index.js'))).toBe(true);
@@ -24,22 +24,30 @@ test.describe('package format (ESM-only, subpath exports)', () => {
   test('plain Node: every exported subpath can be require()d', async () => {
     const probe = `
       const out = {};
-      for (const s of ['config', 'logger']) out[s] = Object.keys(require('@qa-cortex/core/' + s)).length;
+      for (const s of ['config', 'logger', 'secrets', 'guard']) out[s] = Object.keys(require('@qa-cortex/core/' + s)).length;
       process.stdout.write(JSON.stringify(out));`;
     const { stdout, stderr } = await run(process.execPath, ['--input-type=commonjs', '-e', probe], { cwd: import.meta.dirname });
     const counts = JSON.parse(stdout) as Record<string, number>;
     expect(counts.config).toBeGreaterThan(0);
     expect(counts.logger).toBeGreaterThan(0);
+    expect(counts.secrets).toBeGreaterThan(0);
+    expect(counts.guard).toBeGreaterThan(0);
     expect(stderr).toBe('');
   });
 
-  test('the logger module does not depend on the config module', async () => {
-    const distDir = dirname(require.resolve('@qa-cortex/core/logger'));
-    for (const file of (await readdir(distDir)).filter((f) => f.endsWith('.js'))) {
-      // Module specifiers only (comments may mention the config module).
-      expect(await readFile(join(distDir, file), 'utf8'), file).not.toMatch(/(?:from\s*|import\(\s*|require\(\s*)['"](?:\.\.\/config\/|@qa-cortex\/core\/config)/);
-    }
-  });
+  // CLAUDE.md: every module must work without the others. Fixtures meet through fixture NAMES
+  // (qaConfig, qaSecrets), never through imports.
+  for (const subpath of ['config', 'logger', 'secrets', 'guard']) {
+    test(`the ${subpath} module imports no other QA Cortex module`, async () => {
+      const distDir = dirname(require.resolve(`@qa-cortex/core/${subpath}`));
+      const others = ['config', 'logger', 'secrets', 'guard'].filter((m) => m !== subpath).join('|');
+      const crossImport = new RegExp(`(?:from\\s*|import\\(\\s*|require\\(\\s*)['"](?:\\.\\./(?:${others})/|@qa-cortex/core/(?:${others}))`);
+      for (const file of (await readdir(distDir)).filter((f) => f.endsWith('.js'))) {
+        // Module specifiers only (comments may mention other modules).
+        expect(await readFile(join(distDir, file), 'utf8'), `${subpath}/${file}`).not.toMatch(crossImport);
+      }
+    });
+  }
 
   // Runs in a plain Node child process on purpose. Inside this repo the package is reached
   // through the npm workspace symlink (outside node_modules), so Playwright's own module

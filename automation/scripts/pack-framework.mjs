@@ -1,7 +1,7 @@
 // Inside the qa-cortex repository only: builds ../framework and packs @qa-cortex/core into
 // vendor/qa-cortex-core.tgz, the file this project depends on until the package is published.
 //
-//   npm run framework:pack      then   npm install
+//   npm run framework:pack      then   npm install file:vendor/qa-cortex-core.tgz
 //
 // Outside the repository, put a @qa-cortex/core tarball at vendor/qa-cortex-core.tgz yourself.
 // The file name has no version on purpose, so package.json never needs to change.
@@ -25,7 +25,7 @@ if (!existsSync(join(frameworkDir, 'packages', 'core', 'package.json'))) {
   console.error(
     `framework/ not found next to automation/ (looked in ${frameworkDir}).\n` +
       'This script only works inside the qa-cortex repository. Otherwise, place a\n' +
-      '@qa-cortex/core tarball at vendor/qa-cortex-core.tgz and run npm install.',
+      '@qa-cortex/core tarball at vendor/qa-cortex-core.tgz and run: npm install file:vendor/qa-cortex-core.tgz',
   );
   process.exit(1);
 }
@@ -56,7 +56,9 @@ try {
   mkdirSync(dirname(target), { recursive: true });
   copyFileSync(join(packDir, pack.filename), target);
   console.log(`> wrote vendor/qa-cortex-core.tgz (${pack.name}@${pack.version}, ${(statSync(target).size / 1024).toFixed(1)} kB)`);
-  console.log('> next: npm install   (updates package-lock.json if the package contents changed)');
+  // A plain `npm install` keeps an already installed copy (same version, same file: spec),
+  // so name the tarball explicitly: npm re-extracts it and updates the lockfile checksum.
+  console.log('> next: npm install file:vendor/qa-cortex-core.tgz   (refreshes node_modules and package-lock.json)');
 } finally {
   rmSync(packDir, { recursive: true, force: true });
 }

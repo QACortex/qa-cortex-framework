@@ -4,7 +4,7 @@
 // This project uses qaLogAttach: 'on-failure', so:
 //   - the passing test below gets NO qa-cortex-log.jsonl attachment
 //   - the failing test keeps its log as a qa-cortex-log.jsonl attachment
-import { DEMO_SECRET, expect, test } from '../fixtures.js';
+import { expect, test } from '../fixtures.js';
 
 test('passes: no log attachment under on-failure', async ({ page, qaLog }) => {
   qaLog.info('this test passes, so its log is not attached');
@@ -12,10 +12,11 @@ test('passes: no log attachment under on-failure', async ({ page, qaLog }) => {
   await expect(page).toHaveURL(/./);
 });
 
-test('fails on purpose: the log is attached for diagnosis', async ({ page, qaConfig, qaLog }) => {
+test('fails on purpose: the log is attached for diagnosis', async ({ page, qaConfig, qaLog, qaSecretStore }) => {
   qaLog.info('opening home page', { profile: qaConfig.profile });
   await page.goto('./');
-  qaLog.info(`about to check the title, using token ${DEMO_SECRET}`, { password: DEMO_SECRET });
+  const token = qaSecretStore.get('demoToken').reveal();
+  qaLog.info(`about to check the title, using token ${token}`, { password: token });
   qaLog.error('the next assertion fails on purpose to demonstrate on-failure attachments');
 
   // Deliberately wrong expectation. (Never put secrets in assertions: Playwright's own
