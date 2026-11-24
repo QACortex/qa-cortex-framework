@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "demo:local": "node scripts/with-profile.mjs local tests/ui/site.spec.ts tests/ui/logging.spec.ts",
     "demo:staging": "node scripts/with-profile.mjs staging tests/ui/site.spec.ts tests/ui/logging.spec.ts",
+    "demo:ci": "node scripts/ci-preset-demo.mjs",
     "demo:production": "node scripts/with-profile.mjs production tests/ui/site.spec.ts",
     "demo:production-guard": "node scripts/production-guard-demo.mjs",
     "demo:unknown-profile": "node scripts/with-profile.mjs qa",

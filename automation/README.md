@@ -4,10 +4,12 @@ A ready-to-use Playwright automation project built on `@qa-cortex/core`: one typ
 configuration with environment **profiles**, switched with **`QA_CORTEX_PROFILE`**, validated
 before any test runs, a readable **`ConfigError`** when something is wrong, **structured,
 redacting logging** (`qaLog`) visible in the terminal and in Playwright's HTML report, **typed
-secrets** per profile from the environment or a local `.env`, and the **Production guard**.
+secrets** per profile from the environment or a local `.env`, the **Production guard**, and
+**reporter and artifact presets** for local, CI and production runs.
 
 It is an **independent npm project** (its own `package.json` and `package-lock.json`) and uses
-only the public package exports (`@qa-cortex/core/config`, `/logger`, `/secrets`, `/guard`). No
+only the public package exports (`@qa-cortex/core/config`, `/logger`, `/secrets`, `/guard`,
+`/presets`). No
 QA Cortex logic is copied here, and nothing depends on the framework folder at run time.
 
 ## Layout
@@ -16,7 +18,7 @@ QA Cortex logic is copied here, and nothing depends on the framework folder at r
 qa.config.ts              defineQaConfig(): schema extension (site) and profiles local / staging / production
 qa.secrets.ts             defineSecrets(): which environment variable holds each secret, per profile
 .env.example              placeholder values; copy to .env (gitignored) for local runs
-playwright.config.ts      .env loading, loadConfig(), loadSecrets() and the static production guard
+playwright.config.ts      .env loading, loadConfig(), loadSecrets(), the preset and the static production guard
 tests/
   fixtures.ts             config, logger, secrets and guard fixtures in the project's own test.extend()
   ui/                     browser tests (all visit public websites)
@@ -35,7 +37,7 @@ Future test types get their own folders next to `tests/ui/` (for example `tests/
 | `qa.config.ts` | `defineQaConfig()`: a schema extension (`site`) and three profiles: `local`, `staging` and a simulated `production` |
 | `qa.secrets.ts` | `defineSecrets()`: a required secret, a per-profile optional one and an optional one |
 | `.env.example` | the variables `qa.secrets.ts` reads, with placeholders only; the template for your `.env` |
-| `playwright.config.ts` | loads `.env` with Node's `process.loadEnvFile()`; `loadConfig()` and `loadSecrets()` at startup; `baseURL` mapped into `use`; production-safe trace and reporter settings; `assertProductionSafe()` |
+| `playwright.config.ts` | loads `.env` with Node's `process.loadEnvFile()`; `loadConfig()` and `loadSecrets()` at startup; `qaPreset(selectPreset(...))` for reporters and trace/video/screenshot; `baseURL` mapped into `use`; `assertProductionSafe()` |
 | `tests/fixtures.ts` | `configFixtures()`, `loggerFixtures()`, `secretsFixtures()` (after the logger, so every secret is redacted) and `productionGuardFixtures()` composed in the project's own `test` |
 | `tests/ui/site.spec.ts` | one browser test whose target and expectations come from the selected profile |
 | `tests/ui/logging.spec.ts` | logging demo: every level, structured data, `child()` context, secrets with `get()` and `find()`, redaction (passes) |
@@ -44,6 +46,7 @@ Future test types get their own folders next to `tests/ui/` (for example `tests/
 | `scripts/with-profile.mjs` | runs `playwright test` with `QA_CORTEX_PROFILE` set (works in any shell) |
 | `scripts/invalid-config.mjs` | loads a deliberately broken config and prints the `ConfigError` |
 | `scripts/logging-demo.mjs` | runs the logging demo (`success` or `failure`) with a fresh synthetic secret |
+| `scripts/ci-preset-demo.mjs` | runs the smoke and logging tests with `QA_CORTEX_PRESET=ci` and lists the report files written |
 | `scripts/production-guard-demo.mjs` | runs the production profile with `--trace on`; the guard blocks it (exit code 1 expected) |
 | `scripts/pack-framework.mjs` | inside this repository only: builds `../framework` and writes `vendor/qa-cortex-core.tgz` |
 
@@ -230,8 +233,9 @@ This is Playwright's own HTML report, from the most recent run. For each test, l
 
 ## Production guard demo (`@qa-cortex/core/guard`)
 
-The `production` profile is marked `production: true`. `playwright.config.ts` then turns tracing
-off and drops the HTML report, and `assertProductionSafe()` checks that every project agrees.
+The `production` profile is marked `production: true`. `selectPreset()` then always picks the
+`production` preset (no trace, video, screenshot or HTML report), and `assertProductionSafe()`
+checks that every project agrees.
 The `qaProductionGuard` fixture checks again at run time, where command-line flags and
 `test.use()` are visible.
 
@@ -241,8 +245,9 @@ The `qaProductionGuard` fixture checks again at run time, where command-line fla
 npm run demo:production
 ```
 
-- **Terminal:** `[qa-cortex] profile=production … production=true`, then `1 passed`.
-- **Artifacts:** no trace, video or screenshot; no HTML report for this run.
+- **Terminal:** `[qa-cortex] profile=production … production=true preset=production`, then `1 passed`.
+- **Files:** `reports/junit.xml` only (plus Playwright's own `test-results/.last-run.json`): no
+  trace, video, screenshot or HTML report.
 
 **9. Unsafe production run: blocked, exit code 1 is expected**
 
@@ -276,3 +281,77 @@ A `Secret` object prints as `[REDACTED]`, but once you call `reveal()` the value
 string, and whatever receives it (for example `fill()`) can be recorded. See the main README,
 ADR 0007 (`framework/docs/adr/0007-logging.md`) and ADR 0008
 (`framework/docs/adr/0008-secrets-and-production-guard.md`).
+
+## Reporter and artifact presets (`@qa-cortex/core/presets`)
+
+`playwright.config.ts` takes its reporters and its `trace`/`video`/`screenshot` settings from a
+preset. The first line of every run shows which one: `[qa-cortex] … preset=local`.
+
+| Preset | Chosen when | Artifacts | Reporters and files |
+|---|---|---|---|
+| `local` | default | trace, video and screenshot of failed tests | list; HTML report in `playwright-report/` (`npm run report`) |
+| `ci` | `CI` is set | trace and screenshot of failed tests; no video | dot (github on GitHub Actions); HTML report; `reports/junit.xml` |
+| `production` | the profile is `production` (always) | none | list; `reports/junit.xml` |
+
+`QA_CORTEX_PRESET=local|ci|production` chooses a preset by hand, except that a production
+profile always uses `production` (anything else stops the run with a `PresetError`).
+
+**10. CI preset on your machine**
+
+```powershell
+npm run demo:ci
+```
+
+- **Terminal:** `[qa-cortex] … preset=ci`, dot output, then `> reports/junit.xml: written` and
+  `> playwright-report/index.html: written`.
+- `reports/` is gitignored, like `playwright-report/` and `test-results/`.
+
+### Changing a preset
+
+Everything is overridable in `playwright.config.ts`; the result is plain Playwright config.
+
+```ts
+const preset = qaPreset(selectPreset({ production: qa.production }), {
+  artifacts: { video: 'off' },                         // single settings
+  reporters: {
+    junit: { outputFile: 'reports/e2e-junit.xml' },     // options merged over the preset's
+    html: false,                                        // drop a reporter
+    json: true,                                         // add reports/results.json
+    extra: [['./my-reporter.ts']],                      // add any reporter, in order
+  },
+});
+// or the whole list yourself (not combinable with html/junit/json/extra):
+qaPreset('ci', { reporters: { replace: [['line'], ['junit', { outputFile: 'reports/junit.xml' }]] } });
+```
+
+`qaPreset()` stops with a `PresetError` when a report file would land inside `outputDir` (pass
+`outputDir` if you changed it) or the HTML report folder, or two reporters write the same file.
+Command-line flags (`--reporter`, `--trace`) still override the config, as in any Playwright
+project; in production the guard still checks them.
+
+### Allure (not installed here)
+
+Allure is a third-party reporter: install it in your test project, not in QA Cortex. A working
+example follows in a later step; the configuration is:
+
+```powershell
+npm install --save-dev allure-playwright
+```
+
+```ts
+const preset = qaPreset(selectPreset({ production: qa.production }), {
+  reporters: { extra: [['allure-playwright', { resultsDir: 'allure-results' }]] },
+});
+```
+
+In the production preset every reporter other than the console, JUnit and JSON ones must be
+approved, because QA Cortex cannot know what it stores:
+`extra: [{ reporter: ['allure-playwright', { resultsDir: 'allure-results' }], allowInProduction: true }]`.
+`allure-results/` and `allure-report/` are gitignored.
+
+### What presets do not guarantee
+
+Turning artifacts off reduces what is recorded; it is not complete protection. Secrets can still
+reach console output, error and assertion messages, JUnit and JSON results (they carry test
+output and errors), attachments added by tests, and whatever a third-party reporter collects.
+See ADR 0009 (`framework/docs/adr/0009-reporter-artifact-presets.md`).

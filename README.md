@@ -12,7 +12,7 @@ lockfile:
 
 ```
 framework/              framework development and npm packaging (see framework/README.md)
-  packages/core/        @qa-cortex/core: config (ADR 0002), logger (ADR 0007), secrets and guard (ADR 0008)
+  packages/core/        @qa-cortex/core: config (ADR 0002), logger (ADR 0007), secrets and guard (ADR 0008), presets (ADR 0009)
   compat/               packed-package consumer checks
   docs/adr/             architecture decision records (start here)
   spikes/               M0 technical spikes, kept as history
@@ -267,6 +267,42 @@ export default config;
 - HTML and blob reporters give a warning (`reporters: 'error'` makes them an error).
 - The runtime fixture fails the worker before a browser launches. Limits, such as UI mode and
   tracing started by test code, are listed in [ADR 0008](framework/docs/adr/0008-secrets-and-production-guard.md).
+
+## Reporter and artifact presets (`@qa-cortex/core/presets`)
+
+Plain Playwright `reporter` and `use` values for local, CI and production runs. QA Cortex
+implements no reporter: Playwright (or a reporter you install) does all the reporting.
+
+```ts
+// playwright.config.ts
+const preset = qaPreset(selectPreset({ production: qa.production }), {
+  artifacts: { video: 'on-first-retry' },                                 // change single settings
+  reporters: { json: true, extra: [['allure-playwright', { resultsDir: 'allure-results' }]] },
+});
+const config = defineConfig({ reporter: preset.reporter, use: { ...preset.use, baseURL: qa.baseURL } });
+assertProductionSafe(config, { production: qa.production }); // still the final check
+export default config;
+```
+
+| Preset | trace | video | screenshot | reporters |
+|---|---|---|---|---|
+| `local` | retain-on-failure | retain-on-failure | only-on-failure | list, html (never opened) |
+| `ci` | retain-on-failure | off | only-on-failure | github (GitHub Actions) or dot, html, junit → `reports/junit.xml` |
+| `production` | off | off | off | list, junit → `reports/junit.xml` |
+
+- **Selection:** a production profile always gets `production`; otherwise `QA_CORTEX_PRESET`
+  (`local`, `ci`, `production`), then `ci` when `CI` is set, then `local`.
+- **Overrides:** `artifacts` replaces single settings. For reporters, either `replace` (the whole
+  list, on its own) or, in this order: the preset's list, `html`/`junit` options (`false` drops
+  one), `json`, then `extra`.
+- **Production:** `html` and `blob` are never allowed. Reporters other than the console, JUnit
+  and JSON ones (Allure, for example) need `{ reporter: [...], allowInProduction: true }`, in
+  `extra` and `replace` alike.
+- **Paths:** report files must stay out of `outputDir` (cleared on every run) and the HTML report
+  folder; `qaPreset` checks this, as well as two reporters writing the same file.
+- **Not complete protection:** with every artifact off, secrets can still reach console output,
+  error and assertion messages, JUnit/JSON results and third-party reporters. See
+  [ADR 0009](framework/docs/adr/0009-reporter-artifact-presets.md).
 
 ## Key decisions
 

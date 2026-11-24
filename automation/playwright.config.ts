@@ -5,6 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
 import { loadConfig, type ConfigWorkerFixtures } from '@qa-cortex/core/config';
 import { assertProductionSafe } from '@qa-cortex/core/guard';
 import type { LoggerWorkerFixtures } from '@qa-cortex/core/logger';
+import { qaPreset, selectPreset } from '@qa-cortex/core/presets';
 import { loadSecrets } from '@qa-cortex/core/secrets';
 import { qaConfig, type schema } from './qa.config.js';
 import { secretsDef } from './qa.secrets.js';
@@ -20,9 +21,14 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const qa = loadConfig(qaConfig);
 loadSecrets(secretsDef, { profile: qa.profile });
 
+// Reporter and artifact preset: "production" for a production profile, else "ci" when CI is
+// set, else "local"; QA_CORTEX_PRESET=local|ci|production chooses one by hand (never weaker
+// than production). Pass overrides as the second argument, e.g. { artifacts: { video: 'off' } }.
+const preset = qaPreset(selectPreset({ production: qa.production }));
+
 // This file is evaluated in the main process and again in every worker; log once.
 if (!process.env.TEST_WORKER_INDEX) {
-  console.log(`[qa-cortex] profile=${qa.profile} baseURL=${qa.baseURL} production=${String(qa.production)}`);
+  console.log(`[qa-cortex] profile=${qa.profile} baseURL=${qa.baseURL} production=${String(qa.production)} preset=${preset.name}`);
 }
 
 // The intentional-failure demo (tests/failure/) runs ONLY when QAC_DEMO_FAILURE is set,
@@ -31,14 +37,13 @@ const failureDemo = !!process.env.QAC_DEMO_FAILURE;
 
 const config = defineConfig<object, ConfigWorkerFixtures<typeof schema> & LoggerWorkerFixtures>({
   testDir: 'tests',
-  // Native reporters only: terminal list + Playwright's HTML report (`npm run report`).
-  // Production runs skip the HTML report: it embeds screenshots and traces (ADR 0003).
-  reporter: qa.production ? [['list']] : [['list'], ['html', { open: 'never' }]],
+  // Native Playwright reporters chosen by the preset (local: list + HTML report; ci: dot or
+  // github + HTML + JUnit in reports/; production: list + JUnit, no HTML report).
+  reporter: preset.reporter,
   forbidOnly: !!process.env.CI,
   use: {
+    ...preset.use, // trace, video and screenshot for the preset (production: all off)
     baseURL: qa.baseURL, // QA Cortex value mapped explicitly into Playwright's own option
-    // Production records no traces (video and screenshots are off by default).
-    trace: qa.production ? 'off' : 'retain-on-failure',
     qaLogLevel: 'debug', // show every level in this demo (default is 'info')
   },
   projects: failureDemo
