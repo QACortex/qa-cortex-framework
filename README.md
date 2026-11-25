@@ -19,20 +19,22 @@ framework/              framework development and npm packaging (see framework/R
 automation/             ready-to-use automation project (see automation/README.md)
   tests/ui/             browser tests (public websites; not part of framework CI)
   vendor/               packed @qa-cortex/core tarball until the package is published
-.github/workflows/      CI and Compatibility, both run inside framework/
+.github/workflows/      CI and Compatibility (framework/), and Automation tests (automation/, manual only)
 ```
 
 ## Using QA Cortex in a test project
 
 ```powershell
-cd automation
-npm run framework:pack
-npm install file:vendor/qa-cortex-core.tgz
-Copy-Item .env.example .env
-npm run demo:local
+git clone https://github.com/QACortex/qa-cortex-framework.git
+cd qa-cortex-framework/automation
+npm run setup
+npm test
 ```
 
-See [automation/README.md](automation/README.md) for every demo and command.
+`npm run setup` builds and packs the framework, installs the project's dependencies, creates
+`.env` from `.env.example` and installs Chromium. See
+[automation/README.md](automation/README.md#setup-once-inside-automation) for the individual
+steps, other browsers and Linux, and for every demo and command.
 
 Until `@qa-cortex/core` is published, `automation/` installs it from a packed tarball
 (`file:vendor/qa-cortex-core.tgz`). This is temporary: it must be replaced with the published
@@ -40,8 +42,10 @@ npm dependency before Release 1 (steps in [automation/README.md](automation/READ
 
 ## Requirements
 
-- Node.js >= 22.12
+- Node.js >= 22.12 for the framework package (`@qa-cortex/core`); >= 22.18 for the `automation/`
+  starter project (its Allure 3 report generator needs it)
 - npm
+- Git
 
 ## Working on the framework
 
