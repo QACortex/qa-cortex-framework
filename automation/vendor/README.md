@@ -4,7 +4,7 @@ Holds `qa-cortex-core.tgz`, the packed `@qa-cortex/core` this project installs u
 package is published to npm. The tarball is a build artifact and is not committed
 (`*.tgz` is gitignored).
 
-- Inside the qa-cortex repository: `npm run framework:pack`, then `npm install file:vendor/qa-cortex-core.tgz`.
+- Inside the qa-cortex repository: `npm run setup` (does both), or `npm run framework:pack`, then `npm install file:vendor/qa-cortex-core.tgz`.
 - Anywhere else: copy a `@qa-cortex/core` tarball here as `qa-cortex-core.tgz`, then `npm install file:vendor/qa-cortex-core.tgz`.
 
 Name the tarball when installing: a plain `npm install` keeps an already installed copy of the

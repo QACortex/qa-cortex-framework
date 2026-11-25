@@ -38,7 +38,7 @@ tests/
     site.spec.ts            profile-driven smoke test
     logging.spec.ts         logging demo: every level, structured data, redaction
   failure/                intentional-failure demo; runs only via npm run demo:logging-failure
-scripts/                  demo runners and the framework packing helper
+scripts/                  setup, demo runners and the framework packing helper
 vendor/                   packed @qa-cortex/core tarball (not committed; see vendor/README.md)
 reference/                optional local reference scripts: gitignored, never linted, type-checked or run
 playwright-report/, reports/, allure-results/, allure-report/, test-results/   generated reports (gitignored; see Reports)
@@ -62,6 +62,7 @@ Future test types get their own folders next to `tests/ui/` (for example `tests/
 | `scripts/logging-demo.mjs` | runs the logging demo (`success` or `failure`) with a fresh synthetic secret |
 | `scripts/ci-preset-demo.mjs` | runs the smoke and logging tests with `QA_CORTEX_PRESET=ci` and lists the report files written |
 | `scripts/production-guard-demo.mjs` | runs the production profile with `--trace on`; the guard blocks it (exit code 1 expected) |
+| `scripts/setup.mjs` | `npm run setup`: packs the framework, installs dependencies, creates `.env` if missing, installs browsers (default Chromium) |
 | `scripts/pack-framework.mjs` | inside this repository only: builds `../framework` and writes `vendor/qa-cortex-core.tgz` |
 
 All browser tests here visit public websites, so they are **not** part of the framework's
@@ -98,25 +99,33 @@ generator needs it, while `@qa-cortex/core` itself supports 22.12+) and npm. No 
 > 3. Delete `vendor/` and `scripts/pack-framework.mjs`, and remove the `framework:pack` script.
 > 4. Update this setup section and the root README to use a plain `npm install`.
 
-Inside the qa-cortex repository (builds `../framework` and writes the tarball):
+From a fresh clone, in any shell:
 
 ```powershell
-cd automation
-npm run framework:pack
-npm install file:vendor/qa-cortex-core.tgz
-Copy-Item .env.example .env
-npx playwright install chromium firefox webkit
+git clone https://github.com/QACortex/qa-cortex-framework.git
+cd qa-cortex-framework/automation
+npm run setup
+npm test
 ```
 
-Outside the repository, copy a `@qa-cortex/core` tarball to `vendor/qa-cortex-core.tgz`, then
-run the last three commands.
+`npm run setup` runs these steps, which you can also run one by one:
 
-**After re-packing, use `npm install file:vendor/qa-cortex-core.tgz`.** A plain `npm install`
-reports "up to date" and keeps the previously installed copy (same version, same `file:` spec),
-and `npm ci` fails because the lockfile records the old tarball's checksum. Naming the tarball
-re-extracts it and updates the checksum in `package-lock.json`; `package.json` does not change.
-Skip the browser install if the browsers for Playwright 1.65.1 are already installed. Install
-only `chromium` if you run Chromium alone (the default of `npm test`).
+| Step | Command | Notes |
+|---|---|---|
+| 1. Build and pack the framework | `npm run framework:pack` | installs `../framework`'s own dependencies the first time, builds it and writes `vendor/qa-cortex-core.tgz` |
+| 2. Install dependencies | `npm install file:vendor/qa-cortex-core.tgz` | this project's dependencies (from `package-lock.json`) plus the tarball |
+| 3. Create `.env` | `Copy-Item .env.example .env` (PowerShell) or `cp .env.example .env` | skipped by `setup` when `.env` exists; placeholders work for every demo |
+| 4. Install browsers | `npx playwright install chromium` | Chromium only, the default of `npm test`; for cross-browser runs: `npm run setup -- chromium firefox webkit` or `npx playwright install firefox webkit` |
+
+- **Linux:** install the browsers' system libraries once with `npx playwright install-deps chromium` (uses `sudo`).
+- **Outside the repository:** copy a `@qa-cortex/core` tarball to `vendor/qa-cortex-core.tgz` first; `npm run setup` then skips step 1.
+- **First run:** downloads the npm packages (about 45 MB) and Chromium with its headless shell (about 750 MB on disk, shared by every project that uses Playwright 1.65.1); later runs reuse them.
+
+**After a framework change, set up again (or re-pack and run `npm install file:vendor/qa-cortex-core.tgz`).**
+A plain `npm install` reports "up to date" and keeps the previously installed copy (same
+version, same `file:` spec), and `npm ci` fails because the lockfile records the old tarball's
+checksum. Naming the tarball re-extracts it and updates the checksum in `package-lock.json`;
+`package.json` does not change.
 
 ### Secrets: `.env`
 

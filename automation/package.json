@@ -9,6 +9,7 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "framework:pack": "node scripts/pack-framework.mjs",
     "test": "playwright test --project=chromium",
     "test:chromium": "playwright test --project=chromium",
