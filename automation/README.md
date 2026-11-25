@@ -14,8 +14,14 @@ lab with your application, and start writing tests (see [Writing tests](#writing
 
 It is an **independent npm project** (its own `package.json` and `package-lock.json`) and uses
 only the public package exports (`@qa-cortex/core/config`, `/logger`, `/secrets`, `/guard`,
-`/presets`). No
-QA Cortex logic is copied here, and nothing depends on the framework folder at run time.
+`/presets`). No QA Cortex logic is copied here, and nothing depends on the framework folder at
+run time.
+
+**Contents:**
+- **Get started:** [Setup](#setup-once-inside-automation), then [Writing tests](#writing-tests) (page objects, components, fixtures, JSON data, configuration, secrets, logging).
+- **Run and report:** [Running tests](#running-tests), [Reports](#reports), [GitHub Actions](#github-actions).
+- **Help:** [Troubleshooting](#troubleshooting), [Run the demonstrations](#run-the-demonstrations).
+- **New here?** Follow the [acceptance checklist](docs/acceptance-checklist.md) step by step.
 
 ## Layout
 
@@ -40,6 +46,7 @@ tests/
   failure/                intentional-failure demo; runs only via npm run demo:logging-failure
 scripts/                  setup, demo runners and the framework packing helper
 vendor/                   packed @qa-cortex/core tarball (not committed; see vendor/README.md)
+docs/                     acceptance-checklist.md: a step-by-step first-use check
 reference/                optional local reference scripts: gitignored, never linted, type-checked or run
 playwright-report/, reports/, allure-results/, allure-report/, test-results/   generated reports (gitignored; see Reports)
 ../.github/workflows/automation.yml   manual GitHub Actions run of these tests (see GitHub Actions)
@@ -198,9 +205,105 @@ A new page in four steps:
 Tag a test (or a whole `describe`) with Playwright's native tags: `test('…', { tag: '@smoke' }, …)`.
 Tags add up, so a `@regression` describe can hold a test that is also `@smoke`.
 
+### Reusable components
+
+A component is a plain class for a part that several pages share. Pages **hold** one, instead
+of inheriting from a base class. From `components/scenario-menu.ts`:
+
+```ts
+export class ScenarioMenu {
+  readonly root: Locator;
+  constructor(page: Page) {
+    this.root = page.getByRole('complementary', { name: 'Scenarios' });
+  }
+  link(name: string): Locator {
+    return this.root.getByRole('link', { name, exact: true });
+  }
+  async open(category: string, name: string): Promise<void> { /* expand the category, click the link */ }
+}
+
+// in a page object: readonly menu = new ScenarioMenu(page);
+// in a test:        await textBoxPage.menu.open('Elements', 'Check Box');
+```
+
+### Custom fixtures
+
+`tests/fixtures.ts` builds the project's own `test` by chaining Playwright's `test.extend()`:
+first the QA Cortex fixtures, then the page objects. Add your own fixtures to the same chain.
+Anything after `await use(...)` runs when the test finishes, even when it fails, so that is
+where created test data is cleaned up (native fixture teardown):
+
+```ts
+// tests/fixtures.ts: an example for your own application (the lab creates no server data)
+type DataFixtures = { order: { id: string } };
+
+export const test = base
+  // ...the existing .extend() calls...
+  .extend<DataFixtures>({
+    order: async ({ request }, use) => {
+      const order = (await (await request.post('api/orders', { data: { item: 'A-1001' } })).json()) as { id: string };
+      await use(order);                          // the test runs here
+      await request.delete(`api/orders/${order.id}`); // teardown: always runs
+    },
+  });
+```
+
+Fixtures are test-scoped by default: every test gets its own, which keeps tests independent
+and parallel-safe. Use `{ scope: 'worker' }` only for expensive, read-only objects.
+
+### JSON test data and data-driven tests
+
+Put non-sensitive values in `data/<name>.json` and import them natively; TypeScript infers
+the types from the file. From `tests/ui/dropdown.spec.ts`:
+
+```ts
+import data from '../../data/dropdown.json' with { type: 'json' };
+import { expect, test } from '../fixtures.js';
+
+for (const city of data.cities) {
+  test(`selects the city "${city.label}" by its visible text`, async ({ dropdownPage }) => {
+    await dropdownPage.open();
+    await dropdownPage.city.selectOption({ label: city.label });
+    await expect(dropdownPage.city).toHaveValue(city.value);
+  });
+}
+```
+
+Each record becomes its own test: it is named in the report, runs in parallel, and can be
+selected with `-g "Cardiff"`. Test titles must be unique, so include a value from the record.
+
+### Environment configuration and secrets
+
+| Task | Where | How |
+|---|---|---|
+| Point a profile at your environment | `qa.config.ts` | `profiles: { staging: { baseURL: 'https://staging.example.com/' } }`; values not given come from `base` |
+| Add a profile | `qa.config.ts` | add a key under `profiles` (`qa: {}`), then run `QA_CORTEX_PROFILE=qa` (see [Running tests](#running-tests)) |
+| Add a typed setting | `qa.config.ts` | extend `schema` (`coreSchema.extend({ ... })` with the re-exported `z`), set it in `base` or a profile, read it as `qaConfig.<field>` in tests |
+| Add a secret | `qa.secrets.ts`, `.env.example`, `.env` | add `{ env: 'MY_VARIABLE' }` (or per profile: `{ env: { staging: '…' } }`, `optional: true`), add the variable to `.env.example` with a placeholder and to your `.env` with the value; read it in a test with `qaSecretStore.get('name').reveal()` (`find()` for optional ones) |
+| Use a secret in CI | GitHub repository secrets, `.github/workflows/automation.yml` | add the repository secret and a line under the `Run tests` step's `env:` (see [GitHub Actions](#github-actions)) |
+
+An invalid config or a missing secret stops the run before any browser starts, with a
+`ConfigError` or `SecretsError` that names the field or variable, never the value.
+
+### Structured logging
+
+Ask for `qaLog` in a test. Every record goes to the terminal and to the test's
+`qa-cortex-log.jsonl` attachment in the HTML and Allure reports, with secrets redacted:
+
+```ts
+test('logs what happened', async ({ qaLog, qaConfig }) => {
+  const log = qaLog.child({ profile: qaConfig.profile }); // context on every record below
+  log.info('transfer completed', { amount: 100 });         // [info] [profile=local] transfer completed {"amount":100}
+  log.debug('details');                                    // shown because qaLogLevel is 'debug' here
+});
+```
+
+Levels are `debug`, `info`, `warn` and `error`. `qaLogLevel` (in `playwright.config.ts` `use`)
+sets the lowest level shown; `qaLogAttach` (`'always'`, `'on-failure'` or `'off'`) sets when the
+log is attached. More in the [Logging demo](#logging-demo-qa-cortexcorelogger).
+
 Not added on purpose, because Playwright already provides them: wrappers around `click`/`fill`,
 custom waits, retry helpers, a custom tagging or parallel mechanism and a base page class.
-Allure and a CI workflow are planned for the next steps.
 
 ## Running tests
 
@@ -357,6 +460,23 @@ browsers, type-check, lint, run the tests, generate the Allure report, upload th
 | Many tests time out | the lab (or your application) may be down or slow; check it in a browser before changing timeouts |
 | Passed after a retry (**flaky**) | listed as flaky in both reports; fix the test, do not raise retries |
 | Install step fails | `npm ci` in `framework/` needs `framework/package-lock.json` to match its `package.json` |
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `SecretsError` naming `QA_DEMO_TOKEN` at startup | no `.env` (or the variable is not set): run `npm run setup`, or copy `.env.example` to `.env`. A variable set **empty** in your shell also causes it, because shell variables win over `.env`: remove it (`Remove-Item Env:QA_DEMO_TOKEN` or `unset QA_DEMO_TOKEN`) |
+| `ConfigError` at startup | an unknown profile in `QA_CORTEX_PROFILE`, or an invalid value in `qa.config.ts`; the message lists every problem with the layer that caused it |
+| `Executable doesn't exist at …` | the browser is not installed for Playwright 1.65.1: `npx playwright install chromium` (or `firefox`, `webkit`); on Linux also `npx playwright install-deps` |
+| `npm warn EBADENGINE`, or `allure` fails to start | Node.js older than 22.18: upgrade Node (`node --version`) |
+| `npm ci` fails with an integrity (checksum) error | the framework changed since `package-lock.json` was written: run `npm run setup` (or `npm install file:vendor/qa-cortex-core.tgz`) |
+| An old framework version is still used after a change | a plain `npm install` keeps the installed copy: run `npm run setup` |
+| `No tests found` | the filter matched nothing: check the file path, `-g` text or tag (`@smoke`, `@regression`) and `--project` name (`chromium`, `firefox`, `webkit`) |
+| Many tests time out, or `net::ERR_…` on `page.goto` | the application under test is unreachable: open https://qacortex.com/lab-app/ (or your `baseURL`) in a browser before changing timeouts |
+| A test passes alone but fails in a full run | tests share state: give each test its own data and page (fixtures are test-scoped), never depend on test order |
+| The Allure report is empty or missing | run tests first (each run replaces `allure-results/`), then `npm run allure:generate`; production-profile runs write no Allure results |
+| `npm run report` says the port is in use | another report server runs: stop it, or `npx playwright show-report --port 9400` |
+| `ProductionGuardError` | a production-profile run would record traces, videos or screenshots (for example `--trace on`): remove that option |
 
 ## Run the demonstrations
 
