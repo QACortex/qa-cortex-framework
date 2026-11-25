@@ -1,9 +1,116 @@
 # QA Cortex
 
-A thin, composition-first extension layer over [Playwright](https://playwright.dev) (TypeScript).
-It is not a framework with its own runtime: raw Playwright always stays usable.
+A thin, composition-first extension layer over [Playwright](https://playwright.dev) for
+TypeScript test automation, plus a ready-to-use starter project. QA Cortex adds what Playwright
+leaves to each team: typed environment configuration, secrets, redacting logs, production
+safety checks and reporting presets. It never replaces Playwright's runner, `test`, `expect`,
+locators or actions, and raw Playwright always stays usable.
 
-> Status: early development. Nothing is published yet.
+> **Status: early development.** Release 1 targets GUI/web automation. `@qa-cortex/core` is
+> not published to npm yet; the starter project builds it from this repository.
+
+## Why QA Cortex
+
+- **Start writing tests in minutes:** clone, `npm run setup`, `npm test`. The starter project
+  already has page objects, test data, fixtures, cross-browser projects, reports and a CI workflow.
+- **One typed configuration for every environment:** profiles such as `local`, `staging` and
+  `production`, validated before any browser starts, with readable errors.
+- **Secrets handled deliberately:** read from the environment or `.env`, typed, never printed,
+  redacted from QA Cortex logs.
+- **Safe production runs:** the production guard refuses to record traces, videos or
+  screenshots in a production profile.
+- **Plain Playwright underneath:** no base page class, no wrapped actions, no custom runner.
+  Everything you know about Playwright applies, and every module works on its own.
+
+## What's included
+
+| Area | What you get | Provided by |
+|---|---|---|
+| Configuration | typed schema, environment profiles, startup validation, `qaConfig` fixture | QA Cortex core |
+| Secrets | `defineSecrets`, `loadSecrets`, typed `Secret` values, `qaSecretStore` fixture | QA Cortex core |
+| Logging | structured, levelled `qaLog` with redaction and a per-test log attachment | QA Cortex core |
+| Production guard | static and runtime checks against recording artifacts in production | QA Cortex core |
+| Reporting presets | reporters and trace/video/screenshot settings for local, CI and production | QA Cortex core |
+| Test design | page objects, a reusable component, page object fixtures, JSON data, data-driven tests | Starter project |
+| Execution | Chromium, Firefox and WebKit; parallel runs; retries; timeouts; `@smoke`/`@regression` tags; headed, UI and debug modes | Playwright, configured by the starter project |
+| Reports | terminal, HTML, JUnit, Allure; traces, screenshots and videos on failure | Playwright, Allure, QA Cortex presets |
+| CI/CD | manual GitHub Actions workflow with browser, profile and tag choices | Starter project, GitHub Actions |
+
+The full list, with status and references, is in the
+[feature inventory](framework/docs/feature-inventory.md).
+
+## Technology stack
+
+- **Language:** TypeScript 6.0.3 (ESM), Node.js 22.12+ (22.18+ for the starter project)
+- **Test runner:** Playwright Test 1.65.1 (`@qa-cortex/core` supports `>=1.60.0 <2` as a peer dependency)
+- **Validation:** Zod 4 (re-exported as `z` for schema extensions)
+- **Reporting:** Playwright reporters; Allure (`allure-playwright` with the Allure 3 report generator)
+- **Quality:** ESLint 9 with typescript-eslint (type-aware rules)
+- **CI/CD:** GitHub Actions
+- **Packaging:** npm workspaces (`framework/`), packed tarball until npm publishing
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph STARTER["Starter project · automation/"]
+    direction LR
+    SPECS["Spec files<br/>tests/ui/*.spec.ts<br/>@smoke · @regression"]
+    FIX["Project fixtures<br/>tests/fixtures.ts"]
+    POM["Page objects<br/>pages/"]
+    COMP["Components<br/>components/"]
+    DATA["JSON test data<br/>data/"]
+    CFG["qa.config.ts · qa.secrets.ts<br/>playwright.config.ts"]
+    SPECS --> FIX --> POM --> COMP
+    SPECS --> DATA
+  end
+
+  subgraph CORE["QA Cortex core · @qa-cortex/core"]
+    direction LR
+    CONFIG["config<br/>profiles · qaConfig"]
+    SECRETS["secrets<br/>qaSecretStore"]
+    LOGGER["logger<br/>qaLog · redaction"]
+    GUARD["guard<br/>production safety"]
+    PRESETS["presets<br/>reporters · artifacts"]
+    PENDING["sessions · cleanup<br/>(pending)"]
+  end
+
+  subgraph PW["Playwright (native)"]
+    direction LR
+    RUNNER["Test runner<br/>fixtures · projects · workers<br/>retries · tags · UI and debug modes"]
+    BROWSERS["Chromium · Firefox · WebKit"]
+    REPORTERS["Reporters: terminal · HTML · JUnit<br/>traces · screenshots · videos"]
+  end
+
+  subgraph THIRD["Third-party integrations"]
+    direction LR
+    ZOD["Zod<br/>schema validation"]
+    ALLURE["Allure<br/>allure-playwright · Allure 3"]
+    GHA["GitHub Actions<br/>automation.yml (manual)"]
+  end
+
+  subgraph AUT["Application under test"]
+    LAB["QA Cortex Test Automation Lab<br/>qacortex.com/lab-app (or your application)"]
+  end
+
+  STARTER -- "composes fixtures and config" --> CORE
+  CORE -- "extends test · sets reporters and artifacts" --> PW
+  PW -- "drives the browsers" --> AUT
+  CORE -. "uses" .-> ZOD
+  PW -. "reporter added by the presets" .-> ALLURE
+  GHA -. "npm run setup · playwright test" .-> STARTER
+
+  classDef pending stroke-dasharray: 5 5,color:#888;
+  class PENDING pending;
+```
+
+- **Starter project:** your tests, page objects, data and configuration files. You own and
+  change everything here.
+- **QA Cortex core:** fixture factories and helpers that your project composes into its own
+  `test` and `playwright.config.ts`. The modules never import each other.
+- **Playwright:** runs everything: tests, browsers, parallelism, reports and artifacts.
+- **Third-party:** Zod (inside the core), and Allure and GitHub Actions (in the starter project).
+- **Dashed:** planned modules that are not available yet.
 
 ## Repository structure
 
@@ -14,15 +121,22 @@ lockfile:
 framework/              framework development and npm packaging (see framework/README.md)
   packages/core/        @qa-cortex/core: config (ADR 0002), logger (ADR 0007), secrets and guard (ADR 0008), presets (ADR 0009)
   compat/               packed-package consumer checks
-  docs/adr/             architecture decision records (start here)
+  docs/                 architecture decision records (adr/) and the feature inventory
   spikes/               M0 technical spikes, kept as history
-automation/             ready-to-use automation project (see automation/README.md)
-  tests/ui/             browser tests (public websites; not part of framework CI)
+automation/             ready-to-use starter project (see automation/README.md)
+  pages/, components/   page objects and reusable UI components
+  data/                 JSON test data
+  tests/                project fixtures and browser tests (public websites; not part of framework CI)
+  docs/                 manual acceptance checklist
+  scripts/              setup, demos and the framework packing helper
   vendor/               packed @qa-cortex/core tarball until the package is published
 .github/workflows/      CI and Compatibility (framework/), and Automation tests (automation/, manual only)
 ```
 
-## Using QA Cortex in a test project
+## Quick start
+
+**Prerequisites:** Node.js **22.18 or later** for the starter project (22.12 or later for
+`@qa-cortex/core` alone), npm and Git. No Java is needed.
 
 ```powershell
 git clone https://github.com/QACortex/qa-cortex-framework.git
@@ -34,18 +148,77 @@ npm test
 `npm run setup` builds and packs the framework, installs the project's dependencies, creates
 `.env` from `.env.example` and installs Chromium. See
 [automation/README.md](automation/README.md#setup-once-inside-automation) for the individual
-steps, other browsers and Linux, and for every demo and command.
+steps, other browsers and Linux.
 
 Until `@qa-cortex/core` is published, `automation/` installs it from a packed tarball
 (`file:vendor/qa-cortex-core.tgz`). This is temporary: it must be replaced with the published
 npm dependency before Release 1 (steps in [automation/README.md](automation/README.md#setup-once-inside-automation)).
 
-## Requirements
+## Running tests
 
-- Node.js >= 22.12 for the framework package (`@qa-cortex/core`); >= 22.18 for the `automation/`
-  starter project (its Allure 3 report generator needs it)
-- npm
-- Git
+From `automation/`:
+
+```powershell
+npm test                                   # every test, Chromium, headless
+npm run test:smoke                         # @smoke tests
+npm run test:all                           # Chromium, Firefox and WebKit
+npm test -- tests/ui/text-box.spec.ts      # one file
+npm test -- -g "Cardiff"                   # by test name
+npm run test:headed                        # with a visible browser
+npm run test:ui                            # Playwright UI mode
+```
+
+The sample tests run against the [QA Cortex Test Automation Lab](https://qacortex.com/lab-app/),
+a public practice application built for this project. Every option is in
+[Running tests](automation/README.md#running-tests).
+
+## Reporting and CI/CD
+
+- **Reports:** terminal output, the Playwright HTML report (`npm run report`), JUnit XML
+  (`reports/junit.xml`) and Allure (`npm run allure:generate`, then `npm run allure:open`).
+  Failed tests keep their trace, screenshot, video and QA Cortex log.
+- **Presets:** QA Cortex chooses reporters and artifacts for `local`, `ci` and `production`
+  runs. Production runs record no traces, videos or screenshots, and the guard enforces it.
+- **GitHub Actions:** `.github/workflows/automation.yml` runs the starter project's tests on
+  demand. You choose the browser, profile and tags; reports are uploaded even when tests fail.
+  The framework's own checks (`ci.yml`, `compatibility.yml`) run on every pull request.
+
+Details: [Reports](automation/README.md#reports) and [GitHub Actions](automation/README.md#github-actions).
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [automation/README.md](automation/README.md) | using the starter project: setup, writing tests, running, reports, CI, troubleshooting |
+| [automation/docs/acceptance-checklist.md](automation/docs/acceptance-checklist.md) | a step-by-step first-use checklist |
+| [framework/docs/feature-inventory.md](framework/docs/feature-inventory.md) | every feature, its status and where it is documented |
+| [Core modules](#core-modules) (below) | the `@qa-cortex/core` APIs |
+| [framework/README.md](framework/README.md) | developing and testing the framework itself |
+| [framework/docs/adr/](framework/docs/adr/) | architecture decision records |
+
+## Known limitations
+
+- **Not on npm yet:** `@qa-cortex/core` is installed from a tarball built in this repository.
+- **Redaction covers QA Cortex logs only:** Playwright traces, screenshots, videos, HTML
+  reports and Allure results are not redacted. Treat them as sensitive and keep them private
+  ([ADR 0003](framework/docs/adr/0003-s3-trace-secrets.md)).
+- **Public sample application:** the sample tests need the QA Cortex Test Automation Lab to be
+  reachable.
+- **Platforms:** Linux and Windows are tested; macOS is not.
+
+## Roadmap
+
+| Area | Status |
+|---|---|
+| Authentication: roles and reusable sessions for browser and API tests | in development (paused) |
+| Test data cleanup registry | planned (Release 1) |
+| Shared ESLint and TypeScript configuration packages | planned (Release 1) |
+| Publishing `@qa-cortex/core` to npm | planned (Release 1) |
+| API automation package | later phase |
+| AI agent integration | later phase |
+| Visual and accessibility testing examples | deferred |
+
+None of these are available yet; see the [feature inventory](framework/docs/feature-inventory.md).
 
 ## Working on the framework
 
@@ -58,6 +231,11 @@ npm test
 All framework commands (build, typecheck, lint, test, package checks), the CI workflows and
 the compatibility matrix are described in [framework/README.md](framework/README.md).
 Browser tests that visit public websites are not part of the framework checks.
+
+## Core modules
+
+Each module is a separate subpath of `@qa-cortex/core` and works without the others. The
+starter project (`automation/`) uses all of them.
 
 ## Configuration (`@qa-cortex/core/config`)
 
