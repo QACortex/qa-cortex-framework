@@ -59,7 +59,7 @@ Create `pages/radio-button.page.ts`:
 
 ```ts
 import type { Locator, Page } from '@playwright/test';
-import { ScenarioMenu } from '../components/scenario-menu.js';
+import { ScenarioMenu } from '../../components/scenario-menu.js';
 
 /** Lab scenario "Radio Button": delivery and payment choices. */
 export class RadioButtonPage {
@@ -179,6 +179,7 @@ test.describe('Radio Button', { tag: '@regression' }, () => {
 ```
 
 Check and run it:
+Run from the automation folder. 
 
 ```powershell
 npm run typecheck
@@ -196,7 +197,7 @@ npm run test:smoke
 - [ ] `typecheck` and `lint` finish without errors.
 - [ ] The new spec: **4 passed**: the groups test, `selects "Bank Transfer"`, `selects "Credit Card"` and the unavailable option.
 - [ ] `npm run test:smoke`: **7 passed** (the new groups test is also `@smoke`).
-- [ ] The terminal shows `[info] payment method selected {"choice":"Bank Transfer"}`.
+- [ ] The terminal shows `[info] transfer completed {"message":"Transaction TXN480731148 completed successfully."}`
 - [ ] Optional, another browser: `npx playwright install firefox`, then `npx playwright test --project=firefox tests/ui/radio-button.spec.ts`: **4 passed**.
 
 ## 8. Review the HTML report
