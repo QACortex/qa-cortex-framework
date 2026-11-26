@@ -130,6 +130,7 @@ automation/             ready-to-use starter project (see automation/README.md)
   docs/                 manual acceptance checklist
   scripts/              setup, demos and the framework packing helper
   vendor/               packed @qa-cortex/core tarball until the package is published
+docs/                   repository guide: a standalone HTML page for GitHub Pages (self-hosted fonts, no build step)
 .github/workflows/      CI and Compatibility (framework/), and Automation tests (automation/, manual only)
 ```
 
@@ -189,6 +190,7 @@ Details: [Reports](automation/README.md#reports) and [GitHub Actions](automation
 
 | Document | For |
 |---|---|
+| [Repository guide](docs/index.html) (`docs/index.html`) | a visual walkthrough of every folder and file, and how a test run flows through them. A standalone page: download or clone the repository and open it in a browser. It will also be published with GitHub Pages. |
 | [automation/README.md](automation/README.md) | using the starter project: setup, writing tests, running, reports, CI, troubleshooting |
 | [automation/docs/acceptance-checklist.md](automation/docs/acceptance-checklist.md) | a step-by-step first-use checklist |
 | [framework/docs/feature-inventory.md](framework/docs/feature-inventory.md) | every feature, its status and where it is documented |

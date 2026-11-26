@@ -31,7 +31,9 @@ Not a framework with its own runtime.
     tests, compat checks, ADRs in `framework/docs/adr/`, spikes).
   - `automation/`: ready-to-use automation project that consumes the packed
     `@qa-cortex/core` tarball until the package is published.
-- The repository root holds only repo-level files (`.github/`, LICENSE, README, git config).
+- The repository root holds only repo-level files (`.github/`, LICENSE, README, git config)
+  and `docs/`, the standalone documentation site published with GitHub Pages (plain HTML,
+  no build step). Update `docs/index.html` in the same change when the repository structure changes.
 - New framework packages go in `framework/packages/` (e.g. api, ai later).
 
 ## Commands (run inside `framework/`)
