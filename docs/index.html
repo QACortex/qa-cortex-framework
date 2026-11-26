@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QA Cortex Repository Guide</title>
+<meta name="description" content="A walkthrough of every folder and file in the QA Cortex repository: the @qa-cortex/core library, the automation starter project, CI workflows, and how a test run flows through them.">
+<style>
+/* IBM Plex, self-hosted (SIL Open Font License 1.1: fonts/OFL.txt). Latin subsets, plus the "Pi" subset for arrows,
+   declared once per weight so that each weight combines both subsets. */
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular-Latin1.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-SemiBold-Latin1.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Bold-Latin1.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular-Pi.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+2190-2199; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular-Pi.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; unicode-range: U+2190-2199; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular-Pi.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; unicode-range: U+2190-2199; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Regular-Latin1.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Medium-Latin1.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Regular-Pi.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; unicode-range: U+2190-2199; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Regular-Pi.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; unicode-range: U+2190-2199; }
+
+/* Base reset: safe-area padding for phones, no default body margin. */
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+/* Layout: a reference manual. Sticky contents rail on the left (desktop), one reading column on the right;
+   file paths in a mono face, each area tagged by colour: framework, starter project, CI, generated. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #1b2330;
+  --muted: #5a6577;
+  --line: #dde2ea;
+  --accent: #0b6e6e;
+  --accent-soft: #e2f1f0;
+  --fw: #0b6e6e;       --fw-soft: #e2f1f0;
+  --auto: #9a5a00;     --auto-soft: #fbefdc;
+  --ci: #5b4bb7;       --ci-soft: #ecebfa;
+  --gen: #5a6577;      --gen-soft: #eceff3;
+  --warn: #a33a2a;     --warn-soft: #fbe8e4;
+  --code-bg: #eef1f5;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111720; --surface: #18202b; --fg: #e6ebf2; --muted: #9aa6b6; --line: #2a3442;
+    --accent: #4cc3bd; --accent-soft: #15302f;
+    --fw: #4cc3bd; --fw-soft: #15302f; --auto: #f0b35a; --auto-soft: #332611;
+    --ci: #a99cf2; --ci-soft: #241f3f; --gen: #9aa6b6; --gen-soft: #222b37;
+    --warn: #f08a76; --warn-soft: #3a1f1a; --code-bg: #1f2935;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111720; --surface: #18202b; --fg: #e6ebf2; --muted: #9aa6b6; --line: #2a3442;
+  --accent: #4cc3bd; --accent-soft: #15302f;
+  --fw: #4cc3bd; --fw-soft: #15302f; --auto: #f0b35a; --auto-soft: #332611;
+  --ci: #a99cf2; --ci-soft: #241f3f; --gen: #9aa6b6; --gen-soft: #222b37;
+  --warn: #f08a76; --warn-soft: #3a1f1a; --code-bg: #1f2935;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body);
+  font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.shell { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 48px; padding-block: 40px 80px; }
+@media (max-width: 900px) { .shell { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 24px 56px; } }
+
+/* contents rail */
+nav.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+nav.toc .label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; counter-reset: toc; }
+nav.toc a { display: block; padding: 5px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; border-left: 2px solid transparent; }
+nav.toc a:hover { background: var(--surface); border-left-color: var(--accent); }
+nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav.toc .sub a { padding-left: 22px; color: var(--muted); font-size: 13px; }
+@media (max-width: 900px) {
+  nav.toc { position: static; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  nav.toc ol { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  nav.toc .sub { display: none; }
+}
+
+main { min-width: 0; }
+header.intro { margin-bottom: 36px; }
+.eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+h1 { font-size: clamp(30px, 4.5vw, 42px); line-height: 1.15; margin: 6px 0 12px; font-weight: 700; letter-spacing: -.01em; text-wrap: balance; }
+.lede { font-size: 18px; color: var(--muted); max-width: 66ch; margin: 0; }
+h2 { font-size: 26px; line-height: 1.25; margin: 0 0 6px; font-weight: 700; text-wrap: balance; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+h2 .num { font-family: var(--font-mono); font-size: 15px; color: var(--muted); font-weight: 500; }
+h3 { font-size: 19px; margin: 32px 0 8px; font-weight: 600; text-wrap: balance; }
+h4 { font-size: 16px; margin: 22px 0 6px; font-weight: 600; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+p { max-width: 70ch; margin: 0 0 12px; }
+section { padding-top: 40px; margin-top: 40px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+.section-note { color: var(--muted); margin-bottom: 18px; }
+
+code, .path { font-family: var(--font-mono); font-size: .88em; }
+code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+
+/* area tags */
+.tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; letter-spacing: .02em; padding: 2px 9px; border-radius: 999px; white-space: nowrap; font-family: var(--font-body); }
+.tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tag.fw { color: var(--fw); background: var(--fw-soft); }
+.tag.auto { color: var(--auto); background: var(--auto-soft); }
+.tag.ci { color: var(--ci); background: var(--ci-soft); }
+.tag.gen { color: var(--gen); background: var(--gen-soft); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+/* the big-picture strip */
+.map { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: stretch; margin: 22px 0 10px; }
+.map .box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.map .box.fw { border-top: 3px solid var(--fw); }
+.map .box.auto { border-top: 3px solid var(--auto); }
+.map .box .path { font-weight: 500; font-size: 15px; }
+.map .box p { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+.map .link { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; text-align: center; gap: 4px; min-width: 110px; }
+.map .link .arrow { font-family: var(--font-mono); font-size: 20px; color: var(--fg); }
+.map .ci-row { grid-column: 1 / -1; background: var(--ci-soft); border-radius: 10px; padding: 10px 16px; font-size: 14px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 640px) {
+  .map { grid-template-columns: minmax(0, 1fr); }
+  .map .link { flex-direction: row; min-width: 0; }
+  .map .link .arrow { transform: rotate(90deg); }
+}
+
+/* tables */
+.table-wrap { overflow-x: auto; margin: 10px 0 18px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; background: var(--bg); }
+td:first-child { white-space: nowrap; }
+td:first-child code { background: transparent; padding: 0; font-weight: 500; color: var(--fg); }
+td.wrap:first-child { white-space: normal; }
+@media (max-width: 640px) { td:first-child { white-space: normal; } }
+
+/* module cards */
+.modules { display: grid; gap: 18px; margin-top: 12px; }
+.module { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 6px; min-width: 0; }
+.module h4 { margin-top: 0; }
+.module .what { color: var(--muted); font-size: 14.5px; margin-bottom: 4px; }
+.module .table-wrap { border: 0; border-top: 1px solid var(--line); border-radius: 0; margin: 10px -18px 0; }
+
+/* callouts */
+.callout { border-radius: 10px; padding: 14px 16px; margin: 16px 0; font-size: 15px; max-width: 78ch; }
+.callout.warn { background: var(--warn-soft); border-left: 3px solid var(--warn); }
+.callout.info { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+.callout strong { display: block; margin-bottom: 2px; }
+
+/* ordered flow */
+ol.flow { counter-reset: step; list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 12px; max-width: 80ch; }
+ol.flow li { counter-increment: step; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+ol.flow li::before { content: counter(step); font-family: var(--font-mono); font-weight: 500; width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 14px; }
+ul.plain { padding-left: 20px; max-width: 78ch; }
+ul.plain li { margin-bottom: 6px; }
+footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <div class="label">Contents</div>
+    <ol>
+      <li><a href="#overview">Big picture</a></li>
+      <li><a href="#root">Repository root</a></li>
+      <li><a href="#workflows">CI workflows</a></li>
+      <li><a href="#framework">framework/</a></li>
+      <li class="sub"><a href="#core-src">Core modules (src)</a></li>
+      <li class="sub"><a href="#core-tests">Framework tests</a></li>
+      <li class="sub"><a href="#compat">compat, scripts, docs, spikes</a></li>
+      <li><a href="#automation">automation/</a></li>
+      <li><a href="#not-in-git">Not in Git</a></li>
+      <li><a href="#flow">How a test run flows</a></li>
+      <li><a href="#new-features">Adding new features</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="intro">
+      <div class="eyebrow">QA Cortex · repository walkthrough</div>
+      <h1>QA Cortex Repository Guide</h1>
+      <p class="lede">Every folder and file in the repository, what it does, and how the pieces work together. Last updated 26 November 2026.</p>
+      <div class="legend" aria-label="Legend">
+        <span class="tag fw">Framework (library)</span>
+        <span class="tag auto">Starter project</span>
+        <span class="tag ci">CI / GitHub</span>
+        <span class="tag gen">Generated, not in Git</span>
+      </div>
+    </header>
+
+    <section id="overview">
+      <h2><span class="num">0</span>The big picture</h2>
+      <p>The repository holds <strong>two independent npm projects</strong>, each with its own <code>package.json</code> and lockfile. They are connected only through a packed tarball: the starter project never imports framework source files directly.</p>
+      <div class="map">
+        <div class="box fw">
+          <span class="tag fw">framework/</span>
+          <div class="path" style="margin-top:8px">@qa-cortex/core</div>
+          <p>The library: configuration, logging, secrets, production guard, reporting presets. Tested in CI on Linux and Windows.</p>
+        </div>
+        <div class="link"><span class="arrow">→</span><span>packed into<br><code>vendor/qa-cortex-core.tgz</code></span></div>
+        <div class="box auto">
+          <span class="tag auto">automation/</span>
+          <div class="path" style="margin-top:8px">starter project</div>
+          <p>A ready-to-use Playwright project: page objects, test data, fixtures, sample tests, reports.</p>
+        </div>
+        <div class="ci-row"><span class="tag ci">.github/workflows/</span> checks the framework on every pull request, and runs the starter project's tests on demand.</div>
+      </div>
+      <div class="callout info"><strong>One rule shapes everything</strong>QA Cortex extends Playwright and never replaces it: no wrapped actions, no base page class, no custom runner. Raw Playwright always stays usable, and every core module works on its own.</div>
+    </section>
+
+    <section id="root">
+      <h2><span class="num">1</span>Repository root</h2>
+      <p class="section-note">Only repository-level files live here.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>README.md</code></td><td>The front page: overview, architecture diagram, quick start, roadmap, and the API reference for each core module.</td></tr>
+          <tr><td><code>LICENSE</code></td><td>The MIT licence.</td></tr>
+          <tr><td><code>CLAUDE.md</code></td><td>Project rules, for example "never wrap Playwright actions", "no BasePage", "every module works on its own", and the Phase 1 module list. Contributor rules, also read by AI coding assistants.</td></tr>
+          <tr><td><code>.gitignore</code></td><td>What Git never stores: <code>node_modules/</code>, build output, reports, <code>.env</code>, <code>.auth/</code>, tarballs, <code>automation/reference/</code>.</td></tr>
+          <tr><td><code>docs/</code></td><td>This repository guide: a standalone HTML page with self-hosted fonts (<code>docs/fonts/</code>, SIL Open Font License), published with GitHub Pages. <code>.nojekyll</code> makes GitHub serve it as it is.</td></tr>
+          <tr><td><code>.gitattributes</code></td><td>Forces LF line endings on every OS, so Windows and Linux diffs match, and marks images, videos and zips as binary.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="workflows">
+      <h2><span class="num">2</span><span>CI workflows</span> <span class="tag ci">.github/workflows/</span></h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>When it runs</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>ci.yml</code></td><td>Every pull request to <code>main</code>, every push to <code>main</code></td><td>On Ubuntu with Node 22: build, type-check, lint and test the framework, then check its package contents. <strong>The required check.</strong></td></tr>
+          <tr><td><code>compatibility.yml</code></td><td>Every pull request to <code>main</code></td><td>Packs the library and installs it into a fresh consumer project on a matrix: Linux and Windows × Node 22.12, 24, 26 × Playwright 1.60, 1.65, in ESM and CommonJS. Proves the package works for real users.</td></tr>
+          <tr><td><code>automation.yml</code></td><td><strong>Manual only</strong></td><td>Runs the starter project's tests on GitHub; you choose browser, profile and tags. Uploads HTML, JUnit and Allure reports. Never blocks pull requests, because it visits a public website.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="framework">
+      <h2><span class="num">3</span><span>The library</span> <span class="tag fw">framework/</span></h2>
+
+      <h3>3.1 Top-level files</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>README.md</code></td><td>Developer guide for the framework: layout, requirements, commands.</td></tr>
+          <tr><td><code>package.json</code></td><td>A private npm workspaces root (<code>packages/*</code>). Scripts: <code>build</code>, <code>typecheck</code>, <code>lint</code>, <code>test</code>, <code>clean</code>, <code>pack:check</code>, <code>pack:lint</code>.</td></tr>
+          <tr><td><code>package-lock.json</code></td><td>Exact versions of every development dependency.</td></tr>
+          <tr><td><code>tsconfig.base.json</code></td><td>Shared TypeScript settings: strict, ESM, <code>nodenext</code>.</td></tr>
+          <tr><td><code>tsconfig.json</code></td><td>A "solution" file: <code>tsc -b</code> builds every package listed here.</td></tr>
+          <tr><td><code>tsconfig.tools.json</code></td><td>Type-checks config files and scripts that no package owns.</td></tr>
+          <tr><td><code>eslint.config.js</code></td><td>Type-aware lint rules. Also enforces project rules: no top-level <code>await</code> in published code, Playwright imported for types only.</td></tr>
+          <tr><td><code>playwright.config.ts</code></td><td>Runs the framework's own test suite (not browser tests of a website).</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>3.2 The published package <code>packages/core/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>package.json</code></td><td>The package that will go to npm. <strong>exports</strong> lists only <code>./config</code>, <code>./logger</code>, <code>./secrets</code>, <code>./guard</code>, <code>./presets</code>, so users import subpaths, never the whole package. <strong>peerDependencies</strong>: Playwright <code>&gt;=1.60.0 &lt;2</code>, so it is never bundled. The only runtime dependency is Zod.</td></tr>
+          <tr><td><code>LICENSE</code></td><td>MIT, shipped inside the package.</td></tr>
+          <tr><td><code>tsconfig.json</code></td><td>Compiles <code>src/</code> into <code>dist/</code>, with type declarations.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="core-src">3.3 The five modules in <code>src/</code></h3>
+      <p>Each folder is a separate module with its own <code>index.ts</code>, the public entry that decides what users can import. <strong>Modules never import each other.</strong> Their fixtures cooperate only through fixture names: for example, the secrets module reads a fixture called <code>qaConfig</code> without importing the config module.</p>
+
+      <div class="modules">
+        <article class="module">
+          <h4><code>src/config/</code> Typed, layered configuration</h4>
+          <div class="what">Environment profiles validated before any browser starts. ADR 0002.</div>
+          <div class="table-wrap"><table><tbody>
+            <tr><td><code>index.ts</code></td><td>Public entry.</td></tr>
+            <tr><td><code>schema.ts</code></td><td><code>coreSchema</code>: the built-in fields <code>baseURL</code>, <code>production</code>, <code>api</code>, <code>ai</code>. Projects add fields with <code>coreSchema.extend()</code>.</td></tr>
+            <tr><td><code>load.ts</code></td><td><code>defineQaConfig()</code> declares base and profiles; <code>loadConfig()</code> picks the profile (from <code>QA_CORTEX_PROFILE</code>), merges, validates and freezes.</td></tr>
+            <tr><td><code>merge.ts</code></td><td>Layered deep merge: defaults → base → profile → overrides. Remembers which layer set each value, so errors say "set in profile staging". Internal.</td></tr>
+            <tr><td><code>freeze.ts</code></td><td>Deep-freezes the result so tests can't change config by accident. Internal.</td></tr>
+            <tr><td><code>errors.ts</code></td><td><code>ConfigError</code>: every problem at once, with its layer, never the values.</td></tr>
+            <tr><td><code>fixtures.ts</code></td><td><code>configFixtures()</code>: the <code>qaConfig</code> and <code>qaProfile</code> fixtures.</td></tr>
+            <tr><td><code>reserved.ts</code></td><td>Reserves the <code>api</code> and <code>ai</code> sections for future packages.</td></tr>
+            <tr><td><code>types.ts</code></td><td>Type helpers (<code>DeepPartial</code>, <code>DeepReadonly</code>) mirroring the merge and freeze rules.</td></tr>
+          </tbody></table></div>
+        </article>
+
+        <article class="module">
+          <h4><code>src/logger/</code> Structured, redacting logging</h4>
+          <div class="what">A per-test logger whose output hides secrets. ADR 0007.</div>
+          <div class="table-wrap"><table><tbody>
+            <tr><td><code>index.ts</code></td><td>Public entry.</td></tr>
+            <tr><td><code>logger.ts</code></td><td><code>createLogger()</code>: levels, <code>child()</code> context, writing to a sink.</td></tr>
+            <tr><td><code>redact.ts</code></td><td>Replaces known secret values (plain or URL-encoded), and values under sensitive keys such as <code>password</code> or <code>token</code>, with <code>[REDACTED]</code>. Internal.</td></tr>
+            <tr><td><code>format.ts</code></td><td>Output formats: the terminal line (<code>[info] msg {"data":1}</code>) and the JSON line used in the attachment.</td></tr>
+            <tr><td><code>fixtures.ts</code></td><td><code>loggerFixtures()</code>: the per-test <code>qaLog</code>, the options <code>qaLogLevel</code> and <code>qaLogAttach</code>, and the <code>qaSecrets</code> slot. Attaches <code>qa-cortex-log.jsonl</code> to the report.</td></tr>
+            <tr><td><code>types.ts</code></td><td><code>LogLevel</code>, <code>LogRecord</code>, <code>Logger</code>.</td></tr>
+          </tbody></table></div>
+        </article>
+
+        <article class="module">
+          <h4><code>src/secrets/</code> Typed secrets per profile</h4>
+          <div class="what">Secrets from the environment or <code>.env</code>, never printed. ADR 0008.</div>
+          <div class="table-wrap"><table><tbody>
+            <tr><td><code>index.ts</code></td><td>Public entry.</td></tr>
+            <tr><td><code>load.ts</code></td><td><code>defineSecrets()</code> says which environment variable holds each secret, per profile; <code>loadSecrets()</code> reads and validates them (rejects missing, empty or very short values).</td></tr>
+            <tr><td><code>secret.ts</code></td><td>The <code>Secret</code> class: prints as <code>[REDACTED]</code> everywhere; only <code>reveal()</code> returns the value.</td></tr>
+            <tr><td><code>fixtures.ts</code></td><td><code>secretsFixtures()</code>: the <code>qaSecretStore</code> fixture. Feeds every secret to the logger for redaction; its <code>qaSecretsCheck</code> fails the run if fixtures are composed in an order that would switch redaction off.</td></tr>
+            <tr><td><code>errors.ts</code></td><td><code>SecretsError</code>: names the secret and variable, never the value.</td></tr>
+            <tr><td><code>types.ts</code></td><td>Typing for secret definitions and the store.</td></tr>
+          </tbody></table></div>
+        </article>
+
+        <article class="module">
+          <h4><code>src/guard/</code> Production guard</h4>
+          <div class="what">Refuses to record traces, videos or screenshots in a production profile. ADR 0003 and 0008.</div>
+          <div class="table-wrap"><table><tbody>
+            <tr><td><code>index.ts</code></td><td>Public entry.</td></tr>
+            <tr><td><code>check.ts</code></td><td>The rules: in production, trace, video and screenshot must be off; HTML and blob reporters are flagged.</td></tr>
+            <tr><td><code>assert.ts</code></td><td><code>assertProductionSafe()</code>: the <strong>static</strong> check, called at the end of <code>playwright.config.ts</code>.</td></tr>
+            <tr><td><code>fixtures.ts</code></td><td><code>productionGuardFixtures()</code>: the <strong>runtime</strong> check, an automatic worker fixture. Also catches <code>--trace on</code> from the command line, before any browser opens.</td></tr>
+            <tr><td><code>errors.ts</code></td><td><code>ProductionGuardError</code>.</td></tr>
+            <tr><td><code>types.ts</code></td><td>Types for the settings the guard reads.</td></tr>
+          </tbody></table></div>
+        </article>
+
+        <article class="module">
+          <h4><code>src/presets/</code> Reporter and artifact presets</h4>
+          <div class="what">Ready-made reporters and artifact settings for local, CI and production runs. ADR 0009.</div>
+          <div class="table-wrap"><table><tbody>
+            <tr><td><code>index.ts</code></td><td>Public entry.</td></tr>
+            <tr><td><code>select.ts</code></td><td><code>selectPreset()</code>: <code>production</code> for a production profile, otherwise <code>QA_CORTEX_PRESET</code>, then <code>ci</code> when <code>CI</code> is set, then <code>local</code>.</td></tr>
+            <tr><td><code>preset.ts</code></td><td><code>qaPreset()</code>: returns a ready <code>reporter</code> list and <code>use</code> settings for <code>playwright.config.ts</code>.</td></tr>
+            <tr><td><code>artifacts.ts</code></td><td>Trace, video and screenshot settings per preset.</td></tr>
+            <tr><td><code>reporters.ts</code></td><td>The reporter list per preset and the override rules (<code>html</code>, <code>junit</code>, <code>json</code>, <code>extra</code> such as Allure, or <code>replace</code>). Checks that report paths don't collide.</td></tr>
+            <tr><td><code>errors.ts</code></td><td><code>PresetError</code>.</td></tr>
+            <tr><td><code>types.ts</code></td><td>Preset types.</td></tr>
+          </tbody></table></div>
+        </article>
+      </div>
+
+      <h3 id="core-tests">3.4 Framework tests in <code>packages/core/test/</code></h3>
+      <p>145 tests. They run against the <strong>built</strong> <code>dist/</code>, exactly as a user would get the package.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Folder or file</th><th>What it tests</th></tr></thead>
+        <tbody>
+          <tr><td><code>config/*.spec.ts</code></td><td>Merging rules, loading and profile selection, fixtures, <code>baseURL</code> alignment, use from a real Playwright config.</td></tr>
+          <tr><td><code>logger/*.spec.ts</code></td><td>Levels, formatting, redaction, attachments.</td></tr>
+          <tr><td><code>secrets/*.spec.ts</code></td><td>Loading, validation, the <code>Secret</code> class, fixture order.</td></tr>
+          <tr><td><code>guard/*.spec.ts</code></td><td>Every unsafe setting, static and at runtime.</td></tr>
+          <tr><td><code>presets/*.spec.ts</code></td><td>Preset selection, overrides, path checks, interplay with the guard.</td></tr>
+          <tr><td><code>package-format.spec.ts</code></td><td>The package exposes exactly the intended subpaths, and modules don't import each other.</td></tr>
+          <tr><td><code>types/*.types.ts</code></td><td>Compile-only type tests: correct code must type-check, wrong code (marked <code>@ts-expect-error</code>) must fail.</td></tr>
+          <tr><td><code>fixtures/pw-*/</code></td><td>Small <strong>nested Playwright projects</strong> (<code>pw-fixtures</code>, <code>pw-logger</code>, <code>pw-secrets</code>, <code>pw-guard</code>, <code>pw-presets</code>, …) run as separate processes, to prove behaviour inside a real Playwright run. Example: <code>pw-secrets/wrong-merge.spec.ts</code> proves a wrong fixture order is caught.</td></tr>
+          <tr><td><code>helpers/nested-playwright.ts</code></td><td>Starts those nested runs in a clean environment.</td></tr>
+          <tr><td><code>helpers/zip.ts</code></td><td>A tiny zip reader for looking inside Playwright trace files, for example to prove a secret isn't in a trace.</td></tr>
+          <tr><td><code>tsconfig.json</code></td><td>Type-checks the tests against the built package.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3 id="compat">3.5 <code>compat/</code>, <code>scripts/</code>, <code>docs/</code> and <code>spikes/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Path</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>compat/run-consumer.mjs</code></td><td>Copies <code>consumer/</code> to a temporary folder, installs the <strong>packed tarball</strong> plus a chosen Playwright version, and runs it as ESM or CommonJS. Used by <code>compatibility.yml</code>.</td></tr>
+          <tr><td><code>compat/consumer/</code></td><td>A miniature user project: <code>qa.config.ts</code>, <code>qa.secrets.ts</code>, <code>playwright.config.ts</code>, <code>tests/fixtures.ts</code>, <code>tests/fixtures.spec.ts</code> (fixtures work), <code>tests/smoke.spec.ts</code> (a real Chromium test), and <code>server.mjs</code> (a local page, so no internet is needed).</td></tr>
+          <tr><td><code>compat/consumer/probe.mjs</code>, <code>probe.cjs</code></td><td>Import (ESM) and <code>require()</code> (CommonJS) every public subpath.</td></tr>
+          <tr><td><code>scripts/check-package.mjs</code></td><td>Dry-runs <code>npm pack</code>; fails if a declared export is missing, or if tests, caches or <code>node_modules</code> would be published.</td></tr>
+          <tr><td><code>docs/adr/0000</code>–<code>0009</code></td><td><strong>Architecture Decision Records</strong>, each with spike evidence: toolchain (0000), ESM-only format (0001), config merging (0002), what leaks secrets into traces (0003), session design (0004), TypeScript 6 (0005), fixtures (0006), logging (0007), secrets and guard (0008), presets (0009).</td></tr>
+          <tr><td><code>docs/feature-inventory.md</code></td><td>Every feature with its status, category and reference.</td></tr>
+          <tr><td class="wrap"><code>spikes/s0</code>–<code>s4</code></td><td>Throwaway experiments that proved each design before it was built: toolchain, module format, config merge, trace secrets, sessions. <strong>Not built, linted or shipped</strong>; the ADRs cite them as evidence.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="automation">
+      <h2><span class="num">4</span><span>The starter project</span> <span class="tag auto">automation/</span></h2>
+      <p class="section-note">What a test engineer copies and works in: an ordinary Playwright project that uses <code>@qa-cortex/core</code>.</p>
+
+      <h3>4.1 Top-level files</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>README.md</code></td><td>The user manual: setup, writing tests, running, reports, CI, troubleshooting, demos.</td></tr>
+          <tr><td><code>package.json</code></td><td>Dependencies (<code>@qa-cortex/core</code> from <code>vendor/</code>, Playwright 1.65.1, Allure, TypeScript, ESLint), Node <code>&gt;=22.18</code>, and every npm script (<code>setup</code>, <code>test</code>, <code>test:smoke</code>, <code>test:all</code>, <code>allure:generate</code>, <code>demo:*</code>, …).</td></tr>
+          <tr><td><code>package-lock.json</code></td><td>Exact dependency versions.</td></tr>
+          <tr><td><code>playwright.config.ts</code></td><td><strong>The central wiring.</strong> Loads <code>.env</code>; validates config and secrets; picks the preset (reporters, artifacts, Allure); defines the Chromium, Firefox and WebKit projects; sets parallelism, retries and timeouts; runs the static production guard.</td></tr>
+          <tr><td><code>qa.config.ts</code></td><td>The profiles <code>local</code>, <code>staging</code> and <code>production</code> (simulated), all pointing at the lab; extends the schema with a <code>site</code> section.</td></tr>
+          <tr><td><code>qa.secrets.ts</code></td><td>Declares the secrets: <code>QA_DEMO_TOKEN</code> (required) and three optional examples.</td></tr>
+          <tr><td><code>.env.example</code></td><td>A template with placeholders; <code>npm run setup</code> copies it to <code>.env</code>, which is never committed.</td></tr>
+          <tr><td><code>tsconfig.json</code>, <code>eslint.config.js</code></td><td>TypeScript and lint settings for this project.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>4.2 Test design: <code>pages/</code>, <code>components/</code>, <code>data/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Path</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td class="wrap"><code>pages/text-box.page.ts</code>, <code>check-box.page.ts</code>, <code>dropdown.page.ts</code>, <code>text-validation.page.ts</code></td><td><strong>Page objects</strong>: one class per lab page with typed locators, an <code>open()</code> method and user actions such as <code>submitAccountNumber()</code>. No assertions, no base class.</td></tr>
+          <tr><td><code>components/scenario-menu.ts</code></td><td>A <strong>reusable component</strong>: the lab's sidebar menu. Page objects <em>hold</em> one (<code>page.menu</code>) instead of inheriting it.</td></tr>
+          <tr><td class="wrap"><code>data/*.json</code></td><td><strong>Test data</strong>: <code>scenarios.json</code> (menu entries), <code>text-box.json</code> (names), <code>check-box.json</code> (categories), <code>dropdown.json</code> (cities, accounts, languages), <code>text-validation.json</code> (messages, account number). Non-sensitive only.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>4.3 <code>tests/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>fixtures.ts</code></td><td><strong>The project's own <code>test</code>.</strong> Chains the QA Cortex fixtures (config, logger, secrets, guard), then the page object fixtures (<code>textBoxPage</code> and the rest). Every spec imports <code>test</code> from here.</td></tr>
+          <tr><td><code>ui/navigation.spec.ts</code></td><td><code>@smoke</code>: opens each scenario through the sidebar menu; data-driven from <code>scenarios.json</code>.</td></tr>
+          <tr><td><code>ui/text-box.spec.ts</code></td><td><code>@regression</code>: one test per name; read-only vs disabled fields.</td></tr>
+          <tr><td><code>ui/check-box.spec.ts</code></td><td><code>@regression</code>: default states, single selection, Select All / Deselect All.</td></tr>
+          <tr><td><code>ui/dropdown.spec.ts</code></td><td><code>@regression</code>: one test per city; account by value and index; multiple select.</td></tr>
+          <tr><td><code>ui/text-validation.spec.ts</code></td><td><code>@regression</code> (one test also <code>@smoke</code>): required-field error, successful transfer with a dynamic message.</td></tr>
+          <tr><td><code>ui/site.spec.ts</code></td><td><code>@smoke</code>: a profile-driven home-page check.</td></tr>
+          <tr><td><code>ui/logging.spec.ts</code></td><td>Demo of logging and redaction.</td></tr>
+          <tr><td><code>failure/logging-failure.spec.ts</code></td><td>An <strong>intentional failure</strong>, run only by <code>npm run demo:logging-failure</code>, to show failure attachments.</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>4.4 <code>scripts/</code>, <code>vendor/</code>, <code>docs/</code></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td><code>scripts/setup.mjs</code></td><td><code>npm run setup</code>: pack the framework, install, create <code>.env</code>, install browsers.</td></tr>
+          <tr><td><code>scripts/pack-framework.mjs</code></td><td>Builds <code>../framework</code> and writes <code>vendor/qa-cortex-core.tgz</code>. <strong>Temporary</strong>, until npm publishing.</td></tr>
+          <tr><td><code>scripts/with-profile.mjs</code></td><td>Runs Playwright with <code>QA_CORTEX_PROFILE</code> set, in any shell (used by <code>demo:local</code>, <code>demo:staging</code> and others).</td></tr>
+          <tr><td><code>scripts/logging-demo.mjs</code></td><td>Runs the logging demo with a fresh synthetic secret, to show it's redacted.</td></tr>
+          <tr><td><code>scripts/production-guard-demo.mjs</code></td><td>Runs production with <code>--trace on</code> to show the guard blocking it.</td></tr>
+          <tr><td><code>scripts/ci-preset-demo.mjs</code></td><td>Runs with the CI preset and lists the report files.</td></tr>
+          <tr><td><code>scripts/invalid-config.mjs</code></td><td>Loads a broken config to show a readable <code>ConfigError</code>.</td></tr>
+          <tr><td><code>vendor/README.md</code></td><td>Explains the temporary tarball (the tarball itself is gitignored).</td></tr>
+          <tr><td><code>docs/acceptance-checklist.md</code></td><td>The step-by-step first-use checklist.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="not-in-git">
+      <h2><span class="num">5</span><span>Folders that aren't in Git</span> <span class="tag gen">generated</span></h2>
+      <p class="section-note">You will see these on disk; they are created by commands and deliberately ignored.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Folder</th><th>Created by</th></tr></thead>
+        <tbody>
+          <tr><td><code>node_modules/</code></td><td><code>npm install</code> / <code>npm ci</code></td></tr>
+          <tr><td><code>framework/packages/core/dist/</code></td><td><code>npm run build</code>: the compiled library</td></tr>
+          <tr><td><code>automation/vendor/qa-cortex-core.tgz</code></td><td><code>npm run framework:pack</code> / <code>npm run setup</code></td></tr>
+          <tr><td><code>automation/.env</code></td><td><code>npm run setup</code>: your local secrets</td></tr>
+          <tr><td><code>test-results/</code></td><td>Every run: traces, videos and screenshots of failures</td></tr>
+          <tr><td class="wrap"><code>playwright-report/</code>, <code>reports/</code>, <code>allure-results/</code>, <code>allure-report/</code></td><td>The reports</td></tr>
+          <tr><td><code>automation/reference/</code></td><td>An optional folder for personal reference scripts (ignored, never committed)</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout warn"><strong>Not released yet: authentication</strong>Roles and reusable sessions for browser and API tests are in development and paused. They are not part of the repository or the package yet; see the roadmap in the README.</div>
+    </section>
+
+    <section id="flow">
+      <h2><span class="num">6</span>How one test run flows through the files</h2>
+      <ol class="flow">
+        <li><div><code>npm test</code> → Playwright loads <strong><code>automation/playwright.config.ts</code></strong>.</div></li>
+        <li><div>The config loads <code>.env</code>, then calls <code>loadConfig(qaConfig)</code> (<code>qa.config.ts</code> → <code>src/config/load.ts</code>) and <code>loadSecrets(…)</code> (<code>qa.secrets.ts</code> → <code>src/secrets/load.ts</code>). Bad input stops the run here, before any browser starts.</div></li>
+        <li><div><code>qaPreset(selectPreset(…))</code> from <code>src/presets/</code> supplies the reporters and trace, video and screenshot settings, and Allure is added. <code>assertProductionSafe()</code> from <code>src/guard/assert.ts</code> checks the result.</div></li>
+        <li><div>Each worker sets up the fixtures from <strong><code>tests/fixtures.ts</code></strong>: <code>qaConfig</code>, the runtime guard, <code>qaLog</code>, <code>qaSecretStore</code>, then page objects such as <code>textBoxPage</code>.</div></li>
+        <li><div>A spec such as <strong><code>tests/ui/dropdown.spec.ts</code></strong> reads <code>data/dropdown.json</code>, calls the page object <code>pages/dropdown.page.ts</code>, and asserts with plain Playwright <code>expect</code>.</div></li>
+        <li><div>Playwright writes the reports; the logger attaches <code>qa-cortex-log.jsonl</code> with secrets redacted.</div></li>
+      </ol>
+    </section>
+
+    <section id="new-features">
+      <h2><span class="num">7</span>Where new framework features would go</h2>
+      <p>A new core module follows the same pattern as the existing five:</p>
+      <ul class="plain">
+        <li><strong>Code:</strong> a folder <code>framework/packages/core/src/&lt;module&gt;/</code> with <code>index.ts</code>, the implementation, <code>fixtures.ts</code>, <code>errors.ts</code> and <code>types.ts</code>.</li>
+        <li><strong>Public subpath:</strong> an entry in <code>packages/core/package.json</code> <code>exports</code>.</li>
+        <li><strong>Tests:</strong> <code>test/&lt;module&gt;/</code>, a nested <code>test/fixtures/pw-&lt;module&gt;/</code> project, and <code>test/types/&lt;module&gt;.types.ts</code>.</li>
+        <li><strong>Decision record:</strong> a new ADR in <code>framework/docs/adr/</code>.</li>
+        <li><strong>Starter project:</strong> a fixture in <code>automation/tests/fixtures.ts</code>, an example spec and a README section.</li>
+      </ul>
+      <p>A larger area, such as API automation or AI agents, would become a <strong>new package</strong> in <code>framework/packages/</code> instead, as <code>CLAUDE.md</code> plans.</p>
+      <div class="callout info"><strong>Candidates for the next framework feature</strong>Authentication (roles and reusable sessions: in development, paused), the cleanup registry (pending), shared ESLint and TypeScript configuration packages (pending, waiting on the ESLint 9 → 10 decision), npm publishing (pending), and later the API and AI packages.</div>
+    </section>
+
+    <footer>QA Cortex Repository Guide · last updated 26 November 2026 · <a href="https://github.com/QACortex/qa-cortex-framework">QACortex/qa-cortex-framework</a> · MIT licence</footer>
+  </main>
+</div>
+</body>
+</html>
